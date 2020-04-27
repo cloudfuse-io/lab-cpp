@@ -9,6 +9,7 @@ if [ "$1" = 'build' ]; then
       -DARROW_PARQUET=ON \
       -DARROW_S3=ON \
       -DARROW_FILESYSTEM=ON \
+      -DARROW_WITH_ZLIB=ON \
       -DCMAKE_PREFIX_PATH=/install
     make
     make aws-lambda-package-buzz-test1-shared

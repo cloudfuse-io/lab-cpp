@@ -37,8 +37,10 @@ build-arrow-cpp: build-lambda-runtime-cpp build-aws-sdk-cpp
 
 ## deployment commands
 
-# run-local:  bin/buzz-test1-python.zip
-# 	cd bin/buzz-test1-python; python3 -c 'import handler; handler.handler({}, None)'
+run-local-arrow-cpp: build-arrow-cpp
+	docker build -f docker/amznlinux1-run-cpp/Dockerfile -t buzz-amznlinux1-run-cpp  bin/build/buzz
+	# /!\ following does not work with role_arn profile, need to be profile with long term creds
+	docker run -v ~/.aws:/root/.aws -e AWS_PROFILE=bbdev -e BUILD_TYPE=shared buzz-amznlinux1-run-cpp
 
 # temp command:
 force-deploy-dev: build-arrow-cpp

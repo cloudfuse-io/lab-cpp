@@ -1,0 +1,27 @@
+# global configuration
+module "env" {
+  source = "../env"
+}
+
+# function related configuration
+
+variable "function_name" {}
+
+variable "filename" {}
+
+variable "handler" {}
+
+variable "memory_size" {}
+
+variable "timeout" {}
+
+variable "runtime" {}
+
+variable "additional_policies" {
+  type    = list
+  default = []
+}
+
+variable "environment" {
+  type = map
+}

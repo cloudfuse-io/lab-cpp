@@ -1,0 +1,9 @@
+{
+  "C_Cpp.default.configurationProvider": "vector-of-bool.cmake-tools",
+  "cmake.sourceDirectory": "${workspaceFolder}/code",
+  "cmake.buildDirectory": "${workspaceFolder}/code/build",
+  "C_Cpp.default.includePath": [
+    "/home/remito/workspace/arrow/cpp/**",
+    "/home/remito/install/include"
+  ]
+}

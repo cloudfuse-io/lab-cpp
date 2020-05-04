@@ -1,0 +1,3 @@
+[submodule "docker/arrow-cpp/arrow"]
+	path = docker/arrow-cpp/arrow
+	url = https://github.com/apache/arrow.git

@@ -7,10 +7,7 @@ RUN yum update  -y && \
 
 COPY --from=buzz-lambda-runtime-cpp /install /install
 COPY --from=buzz-aws-sdk-cpp /install /install
-
-ENV ARROW_VERSION 0.17.0
-
-RUN git clone -b apache-arrow-${ARROW_VERSION} --depth 1 https://github.com/apache/arrow.git /source 
+COPY docker/arrow-cpp/arrow /source
 
 # patch arrow CMakeLists to build buzz
 RUN echo -e "add_subdirectory(buzz)\n" >> /source/cpp/CMakeLists.txt

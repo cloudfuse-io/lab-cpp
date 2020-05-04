@@ -31,6 +31,7 @@ build-aws-sdk-cpp: build-amznlinux1-build-cpp
 	docker build -t buzz-aws-sdk-cpp .
 
 build-arrow-cpp: build-lambda-runtime-cpp build-aws-sdk-cpp
+	git submodule update --init
 	docker build -f docker/arrow-cpp/Dockerfile -t buzz-arrow-cpp-build .
 	docker run -v ${CURDIR}/bin/build:/source/cpp/build buzz-arrow-cpp-build
 	# docker run -it buzz-arrow-cpp-build bash

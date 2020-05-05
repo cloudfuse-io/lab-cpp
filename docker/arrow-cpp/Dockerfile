@@ -6,6 +6,7 @@ RUN yum update  -y && \
 
 
 COPY --from=buzz-lambda-runtime-cpp /install /install
+COPY docker/arrow-cpp/packager /install/lib/aws-lambda-runtime/cmake/packager
 COPY --from=buzz-aws-sdk-cpp /install /install
 COPY docker/arrow-cpp/arrow /source
 

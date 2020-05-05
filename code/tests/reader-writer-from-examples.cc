@@ -110,9 +110,15 @@ void read_single_column(std::string col_name)
 
   arrow::fs::S3Options options = arrow::fs::S3Options::Defaults();
   options.region = "eu-west-1";
-  // options.endpoint_override = "minio:9000";
-  // options.scheme = "http";
-  // options.ConfigureAccessKey("minio", "minio123")
+  //// temp minio tests ////
+  char *is_local = getenv("IS_LOCAL");
+  if (is_local != NULL && strcmp(is_local, "true") == 0)
+  {
+    options.endpoint_override = "minio:9000";
+    options.scheme = "http";
+    options.ConfigureAccessKey("minio", "minio123");
+  }
+  //// temp minio tests ////
 
   std::shared_ptr<arrow::fs::S3FileSystem> fs;
   PARQUET_ASSIGN_OR_THROW(fs, arrow::fs::S3FileSystem::Make(options));

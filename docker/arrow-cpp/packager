@@ -130,8 +130,6 @@ do
         continue
     fi
 
-    echo pack $i
-
     cp "$i" $PKG_DIR/lib
 done
 

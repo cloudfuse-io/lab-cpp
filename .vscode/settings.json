@@ -4,6 +4,7 @@
   "cmake.buildDirectory": "${workspaceFolder}/code/build",
   "C_Cpp.default.includePath": [
     "${workspaceFolder}/docker/arrow-cpp/arrow/cpp/**",
+    "${workspaceFolder}/bin/build/**",
     "/home/remito/install/include"
   ]
 }

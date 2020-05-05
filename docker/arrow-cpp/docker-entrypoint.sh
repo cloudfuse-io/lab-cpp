@@ -12,7 +12,7 @@ if [ "$1" = 'build' ]; then
       -DARROW_WITH_ZLIB=ON \
       -DCMAKE_PREFIX_PATH=/install
     make
-    make aws-lambda-package-buzz-test1-shared
+    # make aws-lambda-package-buzz-test1-shared
     make aws-lambda-package-buzz-test1-static
 else
     exec "$@"

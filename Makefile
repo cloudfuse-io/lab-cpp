@@ -33,15 +33,14 @@ build-aws-sdk-cpp: build-amznlinux1-build-cpp
 build-arrow-cpp: bin-folder build-lambda-runtime-cpp build-aws-sdk-cpp
 	git submodule update --init
 	docker build -f docker/arrow-cpp/Dockerfile -t buzz-arrow-cpp-build .
-	docker run -v ${CURDIR}/bin/build:/source/cpp/build buzz-arrow-cpp-build
+	docker run --rm -v ${CURDIR}/bin/build:/source/cpp/build buzz-arrow-cpp-build
 	# docker run -it buzz-arrow-cpp-build bash
 
 ## deployment commands
 
 run-local-arrow-cpp: build-arrow-cpp
 	docker build -f docker/amznlinux1-run-cpp/Dockerfile -t buzz-amznlinux1-run-cpp  bin/build/buzz
-	# /!\ following does not work with role_arn profile, need to be profile with long term creds
-	docker run -v ~/.aws:/root/.aws -e AWS_PROFILE=bbdev -e BUILD_TYPE=static buzz-amznlinux1-run-cpp
+	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.yaml up --abort-on-container-exit
 
 # temp command:
 force-deploy-dev: build-arrow-cpp

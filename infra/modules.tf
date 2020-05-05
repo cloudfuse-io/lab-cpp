@@ -18,18 +18,18 @@ module "scanner-cpp-static" {
   }
 }
 
-module "scanner-cpp-shared" {
-  source = "./lambda"
+# module "scanner-cpp-shared" {
+#   source = "./lambda"
 
-  function_name = "test1-cpp-shared"
-  filename      = "../bin/build/buzz/buzz-test1-shared.zip"
-  handler       = "N/A"
-  memory_size   = 128
-  timeout       = 10
-  runtime       = "provided"
+#   function_name = "test1-cpp-shared"
+#   filename      = "../bin/build/buzz/buzz-test1-shared.zip"
+#   handler       = "N/A"
+#   memory_size   = 128
+#   timeout       = 10
+#   runtime       = "provided"
 
-  additional_policies = [aws_iam_policy.scanner-additional-policy.arn]
-  environment = {
-    MOCK = "mock"
-  }
-}
+#   additional_policies = [aws_iam_policy.scanner-additional-policy.arn]
+#   environment = {
+#     MOCK = "mock"
+#   }
+# }

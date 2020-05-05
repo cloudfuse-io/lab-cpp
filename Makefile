@@ -14,7 +14,7 @@ ask-target:
 	@echo "Lets deploy ${GIT_REVISION} in ${STAGE} with profile ${PROFILE}..."
 
 bin-folder:
-	@mkdir -p bin
+	@mkdir -p bin/build
 
 ## build commands
 
@@ -30,7 +30,7 @@ build-aws-sdk-cpp: build-amznlinux1-build-cpp
 	cd docker/aws-sdk-cpp && \
 	docker build -t buzz-aws-sdk-cpp .
 
-build-arrow-cpp: build-lambda-runtime-cpp build-aws-sdk-cpp
+build-arrow-cpp: bin-folder build-lambda-runtime-cpp build-aws-sdk-cpp
 	git submodule update --init
 	docker build -f docker/arrow-cpp/Dockerfile -t buzz-arrow-cpp-build .
 	docker run -v ${CURDIR}/bin/build:/source/cpp/build buzz-arrow-cpp-build
@@ -41,7 +41,7 @@ build-arrow-cpp: build-lambda-runtime-cpp build-aws-sdk-cpp
 run-local-arrow-cpp: build-arrow-cpp
 	docker build -f docker/amznlinux1-run-cpp/Dockerfile -t buzz-amznlinux1-run-cpp  bin/build/buzz
 	# /!\ following does not work with role_arn profile, need to be profile with long term creds
-	docker run -v ~/.aws:/root/.aws -e AWS_PROFILE=bbdev -e BUILD_TYPE=shared buzz-amznlinux1-run-cpp
+	docker run -v ~/.aws:/root/.aws -e AWS_PROFILE=bbdev -e BUILD_TYPE=static buzz-amznlinux1-run-cpp
 
 # temp command:
 force-deploy-dev: build-arrow-cpp

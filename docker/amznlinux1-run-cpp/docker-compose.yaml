@@ -20,7 +20,7 @@ services:
   proxy:
     build:
       context: .
-      dockerfile: ./proxy.Dockerfile
+      dockerfile: ./proxy-nginx.Dockerfile # nginx seems to behave better when increasing bandwidth throttling
     ports:
       - 8080:9000
     depends_on:
@@ -41,6 +41,7 @@ services:
     image: buzz-amznlinux1-run-cpp
     volumes:
       - ~/.aws:/root/.aws
+    cpus: 1.5
     environment:
       AWS_ACCESS_KEY_ID: minio
       AWS_SECRET_ACCESS_KEY: minio123

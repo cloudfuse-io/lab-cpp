@@ -82,7 +82,11 @@ void read_single_column(std::unique_ptr<parquet::arrow::FileReader> reader, std:
   std::cout << "id of " << col_name << " : " << col_index << std::endl;
   
   std::shared_ptr<arrow::Table> table;
+  auto t1 = std::chrono::high_resolution_clock::now();
   PARQUET_THROW_NOT_OK(reader->ReadTable({col_index}, &table));
+  auto t2 = std::chrono::high_resolution_clock::now();
+  auto read_duration = std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();
+  std::cout << "read duration: " << read_duration << std::endl;
   std::cout << "table->num_rows:" << table->num_rows() << std::endl;
   std::cout << "table->num_columns:" << table->num_columns() << std::endl;
 
@@ -90,7 +94,9 @@ void read_single_column(std::unique_ptr<parquet::arrow::FileReader> reader, std:
   auto column_datum = arrow::compute::Datum(table->GetColumnByName("cpm"));
   arrow::compute::Datum result_datum;
   PARQUET_THROW_NOT_OK(arrow::compute::Sum(&function_context, column_datum, &result_datum));
-
+  auto t3 = std::chrono::high_resolution_clock::now();
+  auto sum_duration = std::chrono::duration_cast<std::chrono::microseconds>( t3 - t2 ).count();
+  std::cout << "sum duration: " << sum_duration << std::endl;
   std::cout << "sum:" << result_datum.scalar()->ToString() << std::endl;
   
   std::cout << std::endl;

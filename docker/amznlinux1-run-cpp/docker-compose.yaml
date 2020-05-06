@@ -14,15 +14,47 @@ services:
       interval: 1s
       timeout: 1s
       retries: 10
-  
+    networks:
+      - backend
+
+  proxy:
+    build:
+      context: .
+      dockerfile: ./proxy.Dockerfile
+    ports:
+      - 8080:9000
+    depends_on:
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 1s
+      timeout: 1s
+      retries: 10
+    networks:
+      frontend:
+        aliases:
+          - minio
+      backend:
+
   test:
     image: buzz-amznlinux1-run-cpp
     volumes:
       - ~/.aws:/root/.aws
     environment:
-      AWS_ACCESS_KEY: minio
-      AWS_SECRET_KEY: minio123
+      AWS_ACCESS_KEY_ID: minio
+      AWS_SECRET_ACCESS_KEY: minio123
       BUILD_TYPE: static
     depends_on:
-      minio:
+      proxy:
         condition: service_healthy
+    networks:
+      - frontend
+
+# use networks to have the same hostname for proxy and minio
+# necessary because "host" header is signed by the SDK
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge

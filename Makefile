@@ -39,8 +39,10 @@ build-arrow-cpp: bin-folder build-lambda-runtime-cpp build-aws-sdk-cpp
 ## deployment commands
 
 run-local-arrow-cpp: build-arrow-cpp
-	docker build -f docker/amznlinux1-run-cpp/Dockerfile -t buzz-amznlinux1-run-cpp  bin/build/buzz
+	docker build -f docker/amznlinux1-run-cpp/runtime.Dockerfile -t buzz-amznlinux1-run-cpp  bin/build/buzz
+	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.yaml build
 	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.yaml up --abort-on-container-exit
+	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.yaml rm -fsv
 
 # temp command:
 force-deploy-dev: build-arrow-cpp

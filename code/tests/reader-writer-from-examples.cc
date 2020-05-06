@@ -40,54 +40,22 @@ std::unique_ptr<parquet::arrow::FileReader> get_column(std::unique_ptr<parquet::
   throw std::runtime_error("Field not found in schema");
 }
 
-// #2: Fully read in the file
-void read_whole_file()
+// #1: Fully read in the file
+void read_whole_file(std::unique_ptr<parquet::arrow::FileReader> reader)
 {
   std::cout << "Reading parquet from s3 at once" << std::endl;
 
-  arrow::fs::S3Options options = arrow::fs::S3Options::Defaults();
-  options.region = "eu-west-1";
-  std::shared_ptr<arrow::fs::S3FileSystem> fs;
-  PARQUET_ASSIGN_OR_THROW(fs, arrow::fs::S3FileSystem::Make(options));
-  std::shared_ptr<arrow::io::RandomAccessFile> infile;
-
-  PARQUET_ASSIGN_OR_THROW(
-      // infile, fs->OpenInputFile("temp-pub-buck/parquet-arrow-example.parquet"));
-      infile, fs->OpenInputFile("bb-test-data-dev/bid-small.parquet"));
-
-  std::unique_ptr<parquet::arrow::FileReader> reader;
-  PARQUET_THROW_NOT_OK(
-      parquet::arrow::OpenFile(infile, arrow::default_memory_pool(), &reader));
   std::shared_ptr<arrow::Table> table;
   PARQUET_THROW_NOT_OK(reader->ReadTable(&table));
   std::cout << "Loaded " << table->num_rows() << " rows in " << table->num_columns()
             << " columns." << std::endl;
 }
 
-void read_single_column_chunk(std::string col_name)
+// #2: Fully read in the file read only one row group for the column
+void read_single_column_chunk(std::unique_ptr<parquet::arrow::FileReader> reader, std::string col_name)
 {
   std::cout << "Reading first ColumnChunk of the first RowGroup"
             << std::endl;
-
-  arrow::fs::S3Options options = arrow::fs::S3Options::Defaults();
-  options.region = "eu-west-1";
-
-  std::shared_ptr<arrow::fs::S3FileSystem> fs;
-  PARQUET_ASSIGN_OR_THROW(fs, arrow::fs::S3FileSystem::Make(options));
-
-  std::shared_ptr<arrow::io::RandomAccessFile> infile;
-  PARQUET_ASSIGN_OR_THROW(
-      // infile, fs->OpenInputFile("temp-pub-buck/parquet-arrow-example.parquet"));
-      infile, fs->OpenInputFile("bb-test-data-dev/bid-small.parquet"));
-
-  std::unique_ptr<parquet::arrow::FileReader> reader;
-  PARQUET_THROW_NOT_OK(
-      parquet::arrow::OpenFile(infile, arrow::default_memory_pool(), &reader));
-
-  std::cout << "reader->num_row_groups:" << reader->num_row_groups() << std::endl;
-  std::cout << "reader->num_rows:" << reader->parquet_reader()->metadata()->num_rows() << std::endl;
-  std::cout << "reader->size:" << reader->parquet_reader()->metadata()->size() << std::endl;
-  std::cout << "reader->version:" << reader->parquet_reader()->metadata()->version() << std::endl;
 
   int col_index;
   reader = get_column(std::move(reader), col_name, col_index);
@@ -103,40 +71,11 @@ void read_single_column_chunk(std::string col_name)
   std::cout << std::endl;
 }
 
-void read_single_column(std::string col_name)
+// #3: Read an entire column
+void read_single_column(std::unique_ptr<parquet::arrow::FileReader> reader, std::string col_name)
 {
   std::cout << "Reading first ColumnChunk of the first RowGroup"
             << std::endl;
-
-  arrow::fs::S3Options options = arrow::fs::S3Options::Defaults();
-  options.region = "eu-west-1";
-  //// temp minio tests ////
-  char *is_local = getenv("IS_LOCAL");
-  if (is_local != NULL && strcmp(is_local, "true") == 0)
-  {
-    options.endpoint_override = "minio:9000";
-    options.scheme = "http";
-    options.ConfigureAccessKey("minio", "minio123");
-  }
-  //// temp minio tests ////
-
-  std::shared_ptr<arrow::fs::S3FileSystem> fs;
-  PARQUET_ASSIGN_OR_THROW(fs, arrow::fs::S3FileSystem::Make(options));
-
-  std::shared_ptr<arrow::io::RandomAccessFile> infile;
-  PARQUET_ASSIGN_OR_THROW(
-      // infile, fs->OpenInputFile("temp-pub-buck/parquet-arrow-example.parquet"));
-      infile, fs->OpenInputFile("bb-test-data-dev/bid-large.parquet"));
-
-  std::unique_ptr<parquet::arrow::FileReader> reader;
-  PARQUET_THROW_NOT_OK(
-      parquet::arrow::OpenFile(infile, arrow::default_memory_pool(), &reader));
-  reader->set_use_threads(true);
-
-  std::cout << "reader->num_row_groups:" << reader->num_row_groups() << std::endl;
-  std::cout << "reader->num_rows:" << reader->parquet_reader()->metadata()->num_rows() << std::endl;
-  std::cout << "reader->size:" << reader->parquet_reader()->metadata()->size() << std::endl;
-  std::cout << "reader->version:" << reader->parquet_reader()->metadata()->version() << std::endl;
 
   int col_index;
   reader = get_column(std::move(reader), col_name, col_index);
@@ -160,10 +99,39 @@ void read_single_column(std::string col_name)
 static aws::lambda_runtime::invocation_response my_handler(
     aws::lambda_runtime::invocation_request const &req)
 {
-  std::cout << "Hello from C++" << std::endl;
-  // read_whole_file();
-  // read_single_column_chunk("cpm");
-  read_single_column("cpm");
+  //// setup s3fs ////
+  arrow::fs::S3Options options = arrow::fs::S3Options::Defaults();
+  options.region = "eu-west-1";
+  char *is_local = getenv("IS_LOCAL");
+  if (is_local != NULL && strcmp(is_local, "true") == 0)
+  {
+    options.endpoint_override = "minio:9000";
+    std::cout << "endpoint_override=" << options.endpoint_override << std::endl;
+    options.scheme = "http";
+  }
+  std::shared_ptr<arrow::fs::S3FileSystem> fs;
+  PARQUET_ASSIGN_OR_THROW(fs, arrow::fs::S3FileSystem::Make(options));
+
+  //// setup reader ////
+  std::shared_ptr<arrow::io::RandomAccessFile> infile;
+  PARQUET_ASSIGN_OR_THROW(
+      // infile, fs->OpenInputFile("temp-pub-buck/parquet-arrow-example.parquet"));
+      infile, fs->OpenInputFile("bb-test-data-dev/bid-large.parquet"));
+
+  std::unique_ptr<parquet::arrow::FileReader> reader;
+  PARQUET_THROW_NOT_OK(
+      parquet::arrow::OpenFile(infile, arrow::default_memory_pool(), &reader));
+  reader->set_use_threads(true);
+
+  std::cout << "reader->num_row_groups:" << reader->num_row_groups() << std::endl;
+  std::cout << "reader->num_rows:" << reader->parquet_reader()->metadata()->num_rows() << std::endl;
+  std::cout << "reader->size:" << reader->parquet_reader()->metadata()->size() << std::endl;
+  std::cout << "reader->version:" << reader->parquet_reader()->metadata()->version() << std::endl;
+
+  //// read from s3 ////
+  // read_whole_file(std::move(reader));
+  // read_single_column_chunk(std::move(reader), "cpm");
+  read_single_column(std::move(reader), "cpm");
   return aws::lambda_runtime::invocation_response::success("Yessss!", "text/plain");
 }
 
@@ -186,9 +154,3 @@ int main()
   }
   return 0;
 }
-
-/** CLASSICAL MAIN **/
-// int main(int argc, char** argv) {
-//   aws::lambda_runtime::invocation_request req;
-//   my_handler(req);
-// }

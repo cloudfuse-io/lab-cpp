@@ -1,11 +1,14 @@
-# FROM httpd:2.4
+FROM openresty/openresty:1.15.8.1-3-alpine
 
-# RUN apt-get update && apt-get install -y curl
-# COPY httpd.conf /usr/local/apache2/conf/httpd.conf
+# openresty packages extra ngx options like ngx.sleep
 
-FROM nginx
+RUN apk add --update \
+    curl \
+    && rm -rf /var/cache/apk/*
 
-RUN apt-get update && apt-get install -y curl
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+ADD nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
+
+RUN chgrp -R 0 /usr/local/openresty/nginx/ && \
+    chmod -R g=u /usr/local/openresty/nginx/
 
 EXPOSE 9000

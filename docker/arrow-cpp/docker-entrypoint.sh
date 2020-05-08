@@ -10,10 +10,11 @@ if [ "$1" = 'build' ]; then
       -DARROW_S3=ON \
       -DARROW_FILESYSTEM=ON \
       -DARROW_WITH_ZLIB=ON \
-      -DCMAKE_PREFIX_PATH=/install
+      -DCMAKE_PREFIX_PATH=/install \
+      -DBUZZ_BUILD_FILE=${BUILD_FILE} \
+      -DBUZZ_BUILD_TYPE=${BUILD_TYPE}
     make
-    # make aws-lambda-package-buzz-test1-shared
-    make aws-lambda-package-buzz-test1-static
+    make aws-lambda-package-buzz-${BUILD_FILE}-${BUILD_TYPE}
 else
     exec "$@"
 fi

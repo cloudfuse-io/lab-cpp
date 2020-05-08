@@ -118,26 +118,37 @@ static aws::lambda_runtime::invocation_response my_handler(
   std::shared_ptr<arrow::fs::S3FileSystem> fs;
   PARQUET_ASSIGN_OR_THROW(fs, arrow::fs::S3FileSystem::Make(options));
 
-  //// setup reader ////
-  std::shared_ptr<arrow::io::RandomAccessFile> infile;
-  PARQUET_ASSIGN_OR_THROW(
-      // infile, fs->OpenInputFile("temp-pub-buck/parquet-arrow-example.parquet"));
-      infile, fs->OpenInputFile("bb-test-data-dev/bid-large.parquet"));
+  std::vector<std::string> file_names{
+    "bb-test-data-dev/bid-large.parquet",
+    "bb-test-data-dev/bid-large-arrow-rg-500k.parquet",
+    "bb-test-data-dev/bid-large-arrow-rg-1m.parquet",
+    "bb-test-data-dev/bid-large-nolist-rg-2m.parquet",
+    "bb-test-data-dev/bid-large-nolist-rg-4m.parquet",
+    "bb-test-data-dev/bid-large-nolist-rg-full.parquet",
+  };
 
-  std::unique_ptr<parquet::arrow::FileReader> reader;
-  PARQUET_THROW_NOT_OK(
-      parquet::arrow::OpenFile(infile, arrow::default_memory_pool(), &reader));
-  reader->set_use_threads(true);
+  for(auto&& file_name: file_names) {
+    std::cout << ">>>> file_name: " << file_name << std::endl;
+    //// setup reader ////
+    std::shared_ptr<arrow::io::RandomAccessFile> infile;
+    PARQUET_ASSIGN_OR_THROW(
+        infile, fs->OpenInputFile(file_name));
 
-  std::cout << "reader->num_row_groups:" << reader->num_row_groups() << std::endl;
-  std::cout << "reader->num_rows:" << reader->parquet_reader()->metadata()->num_rows() << std::endl;
-  std::cout << "reader->size:" << reader->parquet_reader()->metadata()->size() << std::endl;
-  std::cout << "reader->version:" << reader->parquet_reader()->metadata()->version() << std::endl;
+    std::unique_ptr<parquet::arrow::FileReader> reader;
+    PARQUET_THROW_NOT_OK(
+        parquet::arrow::OpenFile(infile, arrow::default_memory_pool(), &reader));
+    reader->set_use_threads(false);
 
-  //// read from s3 ////
-  // read_whole_file(std::move(reader));
-  // read_single_column_chunk(std::move(reader), "cpm");
-  read_single_column(std::move(reader), "cpm");
+    // std::cout << "reader->num_row_groups:" << reader->num_row_groups() << std::endl;
+    // std::cout << "reader->num_rows:" << reader->parquet_reader()->metadata()->num_rows() << std::endl;
+    // std::cout << "reader->size:" << reader->parquet_reader()->metadata()->size() << std::endl;
+    // std::cout << "reader->version:" << reader->parquet_reader()->metadata()->version() << std::endl;
+
+    //// read from s3 ////
+    // read_whole_file(std::move(reader));
+    // read_single_column_chunk(std::move(reader), "cpm");
+    read_single_column(std::move(reader), "cpm");
+  }
   return aws::lambda_runtime::invocation_response::success("Yessss!", "text/plain");
 }
 

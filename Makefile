@@ -30,22 +30,44 @@ build-aws-sdk-cpp: build-amznlinux1-build-cpp
 	cd docker/aws-sdk-cpp && \
 	docker build -t buzz-aws-sdk-cpp .
 
-build-arrow-cpp: bin-folder build-lambda-runtime-cpp build-aws-sdk-cpp
+arrow-cpp-build-image: bin-folder build-lambda-runtime-cpp build-aws-sdk-cpp
 	git submodule update --init
 	docker build -f docker/arrow-cpp/Dockerfile -t buzz-arrow-cpp-build .
-	docker run --rm -v ${CURDIR}/bin/build:/source/cpp/build buzz-arrow-cpp-build
 	# docker run -it buzz-arrow-cpp-build bash
+
+build-query-bandwidth: arrow-cpp-build-image
+	docker run --rm -v ${CURDIR}/bin/build:/source/cpp/build -e BUILD_FILE=query-bandwidth -e BUILD_TYPE=static buzz-arrow-cpp-build
+
+build-parquet-reader: arrow-cpp-build-image
+	docker run --rm -v ${CURDIR}/bin/build:/source/cpp/build -e BUILD_FILE=parquet-reader -e BUILD_TYPE=static buzz-arrow-cpp-build
 
 ## deployment commands
 
-run-local-arrow-cpp: build-arrow-cpp
-	docker build -f docker/amznlinux1-run-cpp/runtime.Dockerfile -t buzz-amznlinux1-run-cpp  bin/build/buzz
+compose-clean-run:
 	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.yaml build
 	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.yaml up --abort-on-container-exit
 	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.yaml rm -fsv
 
+run-local-query-bandwidth: build-query-bandwidth
+	docker build \
+	  --build-arg BUILD_FILE=query-bandwidth \
+	  --build-arg BUILD_TYPE=static \
+	  -f docker/amznlinux1-run-cpp/runtime.Dockerfile \
+	  -t buzz-amznlinux1-run-cpp \
+	  bin/build/buzz
+	make compose-clean-run
+
+run-local-parquet-reader: build-parquet-reader
+	docker build \
+	  --build-arg BUILD_FILE=parquet-reader \
+	  --build-arg BUILD_TYPE=static \
+	  -f docker/amznlinux1-run-cpp/runtime.Dockerfile \
+	  -t buzz-amznlinux1-run-cpp \
+	  bin/build/buzz
+	make compose-clean-run
+
 # temp command:
-force-deploy-dev: build-arrow-cpp
+force-deploy-dev: build-query-bandwidth build-parquet-reader
 	@echo "DEPLOYING ${GIT_REVISION} to dev ..."
 	@cd infra; terraform workspace select dev
 	@cd infra; terraform apply --var profile=bbdev --var git_revision=${GIT_REVISION}

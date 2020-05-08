@@ -45,7 +45,6 @@ services:
     environment:
       AWS_ACCESS_KEY_ID: minio
       AWS_SECRET_ACCESS_KEY: minio123
-      BUILD_TYPE: static
     depends_on:
       proxy:
         condition: service_healthy

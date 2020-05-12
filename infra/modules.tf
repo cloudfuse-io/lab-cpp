@@ -33,3 +33,19 @@ module "query-bandwidth-static" {
     MOCK = "mock"
   }
 }
+
+module "mem-alloc-static" {
+  source = "./lambda"
+
+  function_name = "mem-alloc-static"
+  filename      = "../bin/build/buzz/buzz-mem-alloc-static.zip"
+  handler       = "N/A"
+  memory_size   = 2048
+  timeout       = 10
+  runtime       = "provided"
+
+  additional_policies = [aws_iam_policy.scanner-additional-policy.arn]
+  environment = {
+    MOCK = "mock"
+  }
+}

@@ -25,6 +25,10 @@
 
 #include <iostream>
 
+int64_t get_duration(std::chrono::_V2::system_clock::time_point start, std::chrono::_V2::system_clock::time_point end) {
+  return std::chrono::duration_cast<std::chrono::microseconds>(end-start).count();
+}
+
 // helper
 std::unique_ptr<parquet::arrow::FileReader> get_column(std::unique_ptr<parquet::arrow::FileReader> reader, std::string col_name, int& col_index) {
   std::shared_ptr<arrow::Schema> schema;
@@ -85,8 +89,7 @@ void read_single_column(std::unique_ptr<parquet::arrow::FileReader> reader, std:
   auto t1 = std::chrono::high_resolution_clock::now();
   PARQUET_THROW_NOT_OK(reader->ReadTable({col_index}, &table));
   auto t2 = std::chrono::high_resolution_clock::now();
-  auto read_duration = std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count();
-  std::cout << "read duration: " << read_duration << std::endl;
+  std::cout << "read duration: " << get_duration(t1, t2) << std::endl;
   std::cout << "table->num_rows:" << table->num_rows() << std::endl;
   std::cout << "table->num_columns:" << table->num_columns() << std::endl;
 
@@ -95,8 +98,7 @@ void read_single_column(std::unique_ptr<parquet::arrow::FileReader> reader, std:
   arrow::compute::Datum result_datum;
   PARQUET_THROW_NOT_OK(arrow::compute::Sum(&function_context, column_datum, &result_datum));
   auto t3 = std::chrono::high_resolution_clock::now();
-  auto sum_duration = std::chrono::duration_cast<std::chrono::microseconds>( t3 - t2 ).count();
-  std::cout << "sum duration: " << sum_duration << std::endl;
+  std::cout << "sum duration: " << get_duration(t2, t3) << std::endl;
   std::cout << "sum:" << result_datum.scalar()->ToString() << std::endl;
   
   std::cout << std::endl;
@@ -120,11 +122,11 @@ static aws::lambda_runtime::invocation_response my_handler(
 
   std::vector<std::string> file_names{
     "bb-test-data-dev/bid-large.parquet",
-    "bb-test-data-dev/bid-large-arrow-rg-500k.parquet",
-    "bb-test-data-dev/bid-large-arrow-rg-1m.parquet",
-    "bb-test-data-dev/bid-large-nolist-rg-2m.parquet",
-    "bb-test-data-dev/bid-large-nolist-rg-4m.parquet",
-    "bb-test-data-dev/bid-large-nolist-rg-full.parquet",
+    // "bb-test-data-dev/bid-large-arrow-rg-500k.parquet",
+    // "bb-test-data-dev/bid-large-arrow-rg-1m.parquet",
+    // "bb-test-data-dev/bid-large-nolist-rg-2m.parquet",
+    // "bb-test-data-dev/bid-large-nolist-rg-4m.parquet",
+    // "bb-test-data-dev/bid-large-nolist-rg-full.parquet",
   };
 
   for(auto&& file_name: file_names) {
@@ -146,8 +148,8 @@ static aws::lambda_runtime::invocation_response my_handler(
 
     //// read from s3 ////
     // read_whole_file(std::move(reader));
-    // read_single_column_chunk(std::move(reader), "cpm");
-    read_single_column(std::move(reader), "cpm");
+    read_single_column_chunk(std::move(reader), "cpm");
+    // read_single_column(std::move(reader), "cpm");
   }
   return aws::lambda_runtime::invocation_response::success("Yessss!", "text/plain");
 }

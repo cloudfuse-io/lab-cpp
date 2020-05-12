@@ -41,6 +41,9 @@ build-query-bandwidth: arrow-cpp-build-image
 build-parquet-reader: arrow-cpp-build-image
 	docker run --rm -v ${CURDIR}/bin/build:/source/cpp/build -e BUILD_FILE=parquet-reader -e BUILD_TYPE=static buzz-arrow-cpp-build
 
+build-mem-alloc: arrow-cpp-build-image
+	docker run --rm -v ${CURDIR}/bin/build:/source/cpp/build -e BUILD_FILE=mem-alloc -e BUILD_TYPE=static buzz-arrow-cpp-build
+
 ## deployment commands
 
 compose-clean-run:
@@ -66,8 +69,17 @@ run-local-parquet-reader: build-parquet-reader
 	  bin/build/buzz
 	make compose-clean-run
 
+run-local-mem-alloc: build-mem-alloc
+	docker build \
+	  --build-arg BUILD_FILE=mem-alloc \
+	  --build-arg BUILD_TYPE=static \
+	  -f docker/amznlinux1-run-cpp/runtime.Dockerfile \
+	  -t buzz-amznlinux1-run-cpp \
+	  bin/build/buzz
+	make compose-clean-run
+
 # temp command:
-force-deploy-dev: build-query-bandwidth build-parquet-reader
+force-deploy-dev: build-query-bandwidth build-parquet-reader build-mem-alloc
 	@echo "DEPLOYING ${GIT_REVISION} to dev ..."
 	@cd infra; terraform workspace select dev
 	@cd infra; terraform apply --var profile=bbdev --var git_revision=${GIT_REVISION}

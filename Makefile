@@ -46,7 +46,7 @@ build-simd-support: arrow-cpp-build-image
 
 compose-clean-run:
 	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.yaml build
-	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.yaml up --abort-on-container-exit > /dev/null
+	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.yaml up --abort-on-container-exit
 	docker logs amznlinux1-run-cpp_test_1
 	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.yaml rm -fsv
 

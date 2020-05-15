@@ -1,4 +1,4 @@
-FROM buzz-amznlinux1-build-cpp
+FROM cloudfuse/amazonlinux1-cpp-builder:latest
 
 ENV LAMBDA_RUNTIME_VERSION 0.2.6
 

@@ -1,4 +1,4 @@
-FROM buzz-amznlinux1-build-cpp
+FROM cloudfuse/amazonlinux1-cpp-builder:latest
 
 RUN yum update  -y && \
   yum install -y zip && \

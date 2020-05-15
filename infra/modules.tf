@@ -49,3 +49,19 @@ module "mem-alloc-static" {
     MOCK = "mock"
   }
 }
+
+module "simd-support-static" {
+  source = "./lambda"
+
+  function_name = "simd-support-static"
+  filename      = "../bin/build/buzz/buzz-simd-support-static.zip"
+  handler       = "N/A"
+  memory_size   = 128
+  timeout       = 10
+  runtime       = "provided"
+
+  additional_policies = [aws_iam_policy.scanner-additional-policy.arn]
+  environment = {
+    MOCK = "mock"
+  }
+}

@@ -17,16 +17,11 @@ bin-folder:
 	@mkdir -p bin/build
 
 ## build commands
-
-build-amznlinux1-build-cpp:
-	cd docker/amznlinux1-build-cpp && \
-	docker build -t buzz-amznlinux1-build-cpp .
-
-build-lambda-runtime-cpp: build-amznlinux1-build-cpp
+build-lambda-runtime-cpp:
 	cd docker/lambda-runtime-cpp && \
 	docker build -t buzz-lambda-runtime-cpp .
 
-build-aws-sdk-cpp: build-amznlinux1-build-cpp
+build-aws-sdk-cpp:
 	cd docker/aws-sdk-cpp && \
 	docker build -t buzz-aws-sdk-cpp .
 
@@ -44,11 +39,15 @@ build-parquet-reader: arrow-cpp-build-image
 build-mem-alloc: arrow-cpp-build-image
 	docker run --rm -v ${CURDIR}/bin/build:/source/cpp/build -e BUILD_FILE=mem-alloc -e BUILD_TYPE=static buzz-arrow-cpp-build
 
+build-simd-support: arrow-cpp-build-image
+	docker run --rm -v ${CURDIR}/bin/build:/source/cpp/build -e BUILD_FILE=simd-support -e BUILD_TYPE=static buzz-arrow-cpp-build
+
 ## deployment commands
 
 compose-clean-run:
 	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.yaml build
-	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.yaml up --abort-on-container-exit
+	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.yaml up --abort-on-container-exit > /dev/null
+	docker logs amznlinux1-run-cpp_test_1
 	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.yaml rm -fsv
 
 run-local-query-bandwidth: build-query-bandwidth
@@ -78,8 +77,17 @@ run-local-mem-alloc: build-mem-alloc
 	  bin/build/buzz
 	make compose-clean-run
 
+run-local-simd-support: build-simd-support
+	docker build \
+	  --build-arg BUILD_FILE=simd-support \
+	  --build-arg BUILD_TYPE=static \
+	  -f docker/amznlinux1-run-cpp/runtime.Dockerfile \
+	  -t buzz-amznlinux1-run-cpp \
+	  bin/build/buzz
+	make compose-clean-run
+
 # temp command:
-force-deploy-dev: build-query-bandwidth build-parquet-reader build-mem-alloc
+force-deploy-dev: build-query-bandwidth build-parquet-reader build-mem-alloc build-simd-support
 	@echo "DEPLOYING ${GIT_REVISION} to dev ..."
 	@cd infra; terraform workspace select dev
 	@cd infra; terraform apply --var profile=bbdev --var git_revision=${GIT_REVISION}

@@ -16,7 +16,7 @@
 // under the License.
 
 #include <arrow/api.h>
-#include <arrow/filesystem/api.h>
+#include "s3fs.h"
 #include <arrow/compute/api.h>
 #include <arrow/io/api.h>
 #include <aws/lambda-runtime/runtime.h>
@@ -25,7 +25,7 @@
 
 #include <iostream>
 
-int64_t get_duration(std::chrono::_V2::system_clock::time_point start, std::chrono::_V2::system_clock::time_point end) {
+auto get_duration(std::chrono::_V2::system_clock::time_point start, std::chrono::_V2::system_clock::time_point end) {
   return std::chrono::duration_cast<std::chrono::microseconds>(end-start).count();
 }
 
@@ -148,9 +148,12 @@ static aws::lambda_runtime::invocation_response my_handler(
 
     //// read from s3 ////
     // read_whole_file(std::move(reader));
-    read_single_column_chunk(std::move(reader), "cpm");
-    // read_single_column(std::move(reader), "cpm");
+    // read_single_column_chunk(std::move(reader), "cpm");
+    read_single_column(std::move(reader), "cpm");
   }
+
+  fs->GetMetrics()->Print("resp_duration_ms");
+
   return aws::lambda_runtime::invocation_response::success("Yessss!", "text/plain");
 }
 

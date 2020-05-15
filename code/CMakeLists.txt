@@ -11,6 +11,8 @@ target_link_libraries(${BUZZ_TARGET}
   PRIVATE parquet_${BUZZ_BUILD_TYPE} AWS::aws-lambda-runtime s3fs
 )
 
+set_property(TARGET ${BUZZ_TARGET} PROPERTY CXX_STANDARD 17)
+
 add_dependencies(parquet
   ${BUZZ_TARGET}
 )

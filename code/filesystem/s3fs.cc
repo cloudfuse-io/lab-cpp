@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "arrow/filesystem/s3fs.h"
+#include "s3fs.h"
 
 #include <algorithm>
 #include <atomic>
@@ -94,6 +94,7 @@ using ::arrow::fs::internal::ToAwsString;
 using ::arrow::fs::internal::ToURLEncodedAwsString;
 
 const char* kS3DefaultRegion = "us-east-1";
+const auto ref_time = std::chrono::high_resolution_clock::now();
 
 static const char kSep = '/';
 
@@ -372,8 +373,8 @@ Status GetObjectRange(Aws::S3::S3Client* client, const S3Path& path, int64_t sta
 // A RandomAccessFile that reads from a S3 object
 class ObjectInputFile : public io::RandomAccessFile {
  public:
-  ObjectInputFile(Aws::S3::S3Client* client, const S3Path& path)
-      : client_(client), path_(path) {}
+  ObjectInputFile(Aws::S3::S3Client* client, const S3Path& path, std::shared_ptr<MetricsManager> metrics_manager)
+      : client_(client), path_(path), metrics_manager_(metrics_manager) {}
 
   Status Init() {
     // Issue a HEAD Object to get the content-length and ensure any
@@ -453,10 +454,21 @@ class ObjectInputFile : public io::RandomAccessFile {
 
     // Read the desired range of bytes
     S3Model::GetObjectResult result;
+    auto start_time = std::chrono::high_resolution_clock::now();
     RETURN_NOT_OK(GetObjectRange(client_, path_, position, nbytes, &result));
-
+    auto head_time = std::chrono::high_resolution_clock::now();
     auto& stream = result.GetBody();
     stream.read(reinterpret_cast<char*>(out), nbytes);
+    auto dl_time = std::chrono::high_resolution_clock::now();
+
+    auto resp_duration = std::chrono::duration_cast<std::chrono::milliseconds>(head_time - start_time).count();
+    auto dl_duration = std::chrono::duration_cast<std::chrono::milliseconds>(dl_time - head_time).count();
+    auto resp_absolute = std::chrono::duration_cast<std::chrono::milliseconds>(start_time - ref_time).count();
+    auto dl_absolute = std::chrono::duration_cast<std::chrono::milliseconds>(head_time - ref_time).count();
+
+    auto range = std::to_string(position) + "x" + std::to_string(nbytes);
+    metrics_manager_->AddMetric(MetricEvent{ resp_absolute, path_.key, range, "resp_duration_ms",  resp_duration });
+    metrics_manager_->AddMetric(MetricEvent{ dl_absolute, path_.key, range, "dl_duration_ms", dl_duration });
     // NOTE: the stream is a stringstream by default, there is no actual error
     // to check for.  However, stream.fail() may return true if EOF is reached.
     return stream.gcount();
@@ -497,6 +509,7 @@ class ObjectInputFile : public io::RandomAccessFile {
   bool closed_ = false;
   int64_t pos_ = 0;
   int64_t content_length_ = -1;
+  std::shared_ptr<MetricsManager> metrics_manager_;
 };
 
 // A non-copying istream.
@@ -1207,7 +1220,7 @@ class S3FileSystem::Impl {
   }
 };
 
-S3FileSystem::S3FileSystem(const S3Options& options) : impl_(new Impl{options}) {}
+S3FileSystem::S3FileSystem(const S3Options& options) : impl_(new Impl{options}), metrics_manager_(new MetricsManager()) {}
 
 S3FileSystem::~S3FileSystem() {}
 
@@ -1468,7 +1481,7 @@ Result<std::shared_ptr<io::InputStream>> S3FileSystem::OpenInputStream(
   RETURN_NOT_OK(S3Path::FromString(s, &path));
   RETURN_NOT_OK(ValidateFilePath(path));
 
-  auto ptr = std::make_shared<ObjectInputFile>(impl_->client_.get(), path);
+  auto ptr = std::make_shared<ObjectInputFile>(impl_->client_.get(), path, metrics_manager_);
   RETURN_NOT_OK(ptr->Init());
   return ptr;
 }
@@ -1479,7 +1492,7 @@ Result<std::shared_ptr<io::RandomAccessFile>> S3FileSystem::OpenInputFile(
   RETURN_NOT_OK(S3Path::FromString(s, &path));
   RETURN_NOT_OK(ValidateFilePath(path));
 
-  auto ptr = std::make_shared<ObjectInputFile>(impl_->client_.get(), path);
+  auto ptr = std::make_shared<ObjectInputFile>(impl_->client_.get(), path, metrics_manager_);
   RETURN_NOT_OK(ptr->Init());
   return ptr;
 }
@@ -1502,6 +1515,27 @@ Result<std::shared_ptr<io::OutputStream>> S3FileSystem::OpenAppendStream(
   // https://docs.aws.amazon.com/AmazonS3/latest/API/mpUploadUploadPartCopy.html
   // (but would need to fall back to GET if the current data is < 5 MB)
   return Status::NotImplemented("It is not possible to append efficiently to S3 objects");
+}
+
+std::shared_ptr<MetricsManager> S3FileSystem::GetMetrics() {
+  return metrics_manager_;
+}
+
+void MetricsManager::Print(std::string type) const {
+  std::lock_guard<std::mutex> guard(metrics_mutex_);
+  std::cout << "metrics: " << std::endl;
+  for (auto metric: metrics_) {
+    if (metric.type == type) {
+      std::cout << metric.filename << "," << metric.range << "," << metric.time <<  "," << metric.value << std::endl;
+    }
+    
+  }
+}
+
+Status MetricsManager::AddMetric(MetricEvent metric) {
+  std::lock_guard<std::mutex> guard(metrics_mutex_);
+  metrics_.push_back(metric);
+  return Status::OK();
 }
 
 }  // namespace fs

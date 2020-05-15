@@ -18,6 +18,7 @@
 #pragma once
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -81,6 +82,24 @@ struct ARROW_EXPORT S3Options {
                                    std::string* out_path = NULLPTR);
 };
 
+struct ARROW_EXPORT MetricEvent {
+  int64_t time;
+  std::string filename;
+  std::string range;
+  std::string type;
+  int64_t value;
+};
+
+class ARROW_EXPORT MetricsManager {
+  public:
+    void Print(const std::string type) const;
+    // Result<std::vector<MetricEvent>> Metrics();
+    Status AddMetric(MetricEvent metric);
+  private:
+    mutable std::mutex metrics_mutex_;
+    std::vector<MetricEvent> metrics_;
+};
+
 /// S3-backed FileSystem implementation.
 ///
 /// Some implementation notes:
@@ -137,6 +156,8 @@ class ARROW_EXPORT S3FileSystem : public FileSystem {
 
   Result<std::shared_ptr<io::OutputStream>> OpenAppendStream(
       const std::string& path) override;
+  
+  std::shared_ptr<MetricsManager> GetMetrics();
 
   /// Create a S3FileSystem instance from the given options.
   static Result<std::shared_ptr<S3FileSystem>> Make(const S3Options& options);
@@ -146,6 +167,7 @@ class ARROW_EXPORT S3FileSystem : public FileSystem {
 
   class Impl;
   std::unique_ptr<Impl> impl_;
+  std::shared_ptr<fs::MetricsManager> metrics_manager_;
 };
 
 enum class S3LogLevel : int8_t { Off, Fatal, Error, Warn, Info, Debug, Trace };

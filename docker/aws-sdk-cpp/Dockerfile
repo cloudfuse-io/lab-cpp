@@ -1,6 +1,6 @@
-FROM buzz-amznlinux1-build-cpp
+FROM cloudfuse/amazonlinux1-cpp-builder:latest
 
-ENV SDK_VERSION 1.7.160
+ENV SDK_VERSION 1.7.333
 
 RUN git clone -b ${SDK_VERSION} --depth 1 https://github.com/aws/aws-sdk-cpp.git /source
 
@@ -8,7 +8,7 @@ RUN mkdir -p /source/build && \
   cd /source/build && \
   cmake .. \
     -DBUILD_ONLY="config;s3;transfer" \
-    -DBUILD_SHARED_LIBS=ON \
+    -DBUILD_SHARED_LIBS=OFF \
     -DCMAKE_CXX_FLAGS="-w" \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/install \

@@ -1,4 +1,4 @@
-FROM cloudfuse/amazonlinux1-cpp-builder:latest
+FROM cloudfuse/amazonlinux1-builder:gcc72
 
 RUN yum update  -y && \
   yum install -y zip && \

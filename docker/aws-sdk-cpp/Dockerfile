@@ -1,4 +1,4 @@
-FROM cloudfuse/amazonlinux1-cpp-builder:latest
+FROM cloudfuse/amazonlinux1-builder:gcc72
 
 ENV SDK_VERSION 1.7.333
 

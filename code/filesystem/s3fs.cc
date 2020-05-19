@@ -19,7 +19,6 @@
 
 #include <algorithm>
 #include <atomic>
-#include <condition_variable>
 #include <sstream>
 #include <unordered_map>
 #include <utility>
@@ -370,8 +369,9 @@ Status GetObjectRange(Aws::S3::S3Client* client, const S3Path& path, int64_t sta
 // A RandomAccessFile that reads from a S3 object
 class ObjectInputFile : public io::RandomAccessFile {
  public:
-  ObjectInputFile(Aws::S3::S3Client* client, const S3Path& path, std::shared_ptr<MetricsManager> metrics_manager)
-      : client_(client), path_(path), metrics_manager_(metrics_manager) {}
+  ObjectInputFile(Aws::S3::S3Client* client, const S3Path& path,
+                  std::shared_ptr<MetricsManager> metrics_manager, std::shared_ptr<DownloadScheduler> download_scheduler)
+      : client_(client), path_(path), metrics_manager_(metrics_manager), download_scheduler_(download_scheduler) {}
 
   Status Init() {
     // Issue a HEAD Object to get the content-length and ensure any
@@ -451,11 +451,13 @@ class ObjectInputFile : public io::RandomAccessFile {
 
     // Read the desired range of bytes
     S3Model::GetObjectResult result;
+    download_scheduler_->Wait();
     metrics_manager_->NewEvent("get_obj_start");
     RETURN_NOT_OK(GetObjectRange(client_, path_, position, nbytes, &result));
     metrics_manager_->NewEvent("get_obj_head_end");
     auto& stream = result.GetBody();
     stream.read(reinterpret_cast<char*>(out), nbytes);
+    download_scheduler_->Notify();
     metrics_manager_->NewEvent("get_obj_body_end");
 
     // NOTE: the stream is a stringstream by default, there is no actual error
@@ -499,6 +501,7 @@ class ObjectInputFile : public io::RandomAccessFile {
   int64_t pos_ = 0;
   int64_t content_length_ = -1;
   std::shared_ptr<MetricsManager> metrics_manager_;
+  std::shared_ptr<DownloadScheduler> download_scheduler_;
 };
 
 // A non-copying istream.
@@ -1209,7 +1212,8 @@ class S3FileSystem::Impl {
   }
 };
 
-S3FileSystem::S3FileSystem(const S3Options& options) : impl_(new Impl{options}), metrics_manager_(new MetricsManager()) {}
+S3FileSystem::S3FileSystem(const S3Options& options) : impl_(new Impl{options}),
+      metrics_manager_(new MetricsManager()), download_scheduler_(new DownloadScheduler()) {}
 
 S3FileSystem::~S3FileSystem() {}
 
@@ -1470,7 +1474,7 @@ Result<std::shared_ptr<io::InputStream>> S3FileSystem::OpenInputStream(
   RETURN_NOT_OK(S3Path::FromString(s, &path));
   RETURN_NOT_OK(ValidateFilePath(path));
 
-  auto ptr = std::make_shared<ObjectInputFile>(impl_->client_.get(), path, metrics_manager_);
+  auto ptr = std::make_shared<ObjectInputFile>(impl_->client_.get(), path, metrics_manager_, download_scheduler_);
   RETURN_NOT_OK(ptr->Init());
   return ptr;
 }
@@ -1481,7 +1485,7 @@ Result<std::shared_ptr<io::RandomAccessFile>> S3FileSystem::OpenInputFile(
   RETURN_NOT_OK(S3Path::FromString(s, &path));
   RETURN_NOT_OK(ValidateFilePath(path));
 
-  auto ptr = std::make_shared<ObjectInputFile>(impl_->client_.get(), path, metrics_manager_);
+  auto ptr = std::make_shared<ObjectInputFile>(impl_->client_.get(), path, metrics_manager_, download_scheduler_);
   RETURN_NOT_OK(ptr->Init());
   return ptr;
 }
@@ -1547,6 +1551,22 @@ Status MetricsManager::NewEvent(std::string type) {
   };
   std::lock_guard<std::mutex> guard(metrics_mutex_);
   metrics_.push_back(event);
+  return Status::OK();
+}
+
+Status DownloadScheduler::Wait() {
+  std::unique_lock<std::mutex> lk(concurrent_dl_mutex_);
+  concurrent_dl_cv_.wait(lk, [this]{ return concurrent_dl_ < 8; });
+  ++concurrent_dl_;
+  return Status::OK();
+}
+
+Status DownloadScheduler::Notify() {
+  {
+    std::unique_lock<std::mutex> lk(concurrent_dl_mutex_);
+    --concurrent_dl_;
+  }
+  concurrent_dl_cv_.notify_all();
   return Status::OK();
 }
 

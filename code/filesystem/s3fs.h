@@ -20,6 +20,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <condition_variable>
 #include <vector>
 #include <thread>
 
@@ -100,6 +101,17 @@ class ARROW_EXPORT MetricsManager {
     std::chrono::_V2::system_clock::time_point ref_time = std::chrono::high_resolution_clock::now();
 };
 
+class ARROW_EXPORT DownloadScheduler {
+  public:
+    Status Wait();
+    Status Notify();
+
+  private:
+    std::mutex concurrent_dl_mutex_;
+    std::condition_variable concurrent_dl_cv_;
+    int16_t concurrent_dl_ = 0;
+};
+
 /// S3-backed FileSystem implementation.
 ///
 /// Some implementation notes:
@@ -167,7 +179,8 @@ class ARROW_EXPORT S3FileSystem : public FileSystem {
 
   class Impl;
   std::unique_ptr<Impl> impl_;
-  std::shared_ptr<fs::MetricsManager> metrics_manager_;
+  std::shared_ptr<MetricsManager> metrics_manager_;
+  std::shared_ptr<DownloadScheduler> download_scheduler_;
 };
 
 enum class S3LogLevel : int8_t { Off, Fatal, Error, Warn, Info, Debug, Trace };

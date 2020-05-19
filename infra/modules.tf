@@ -8,7 +8,7 @@ module "parquet-reader-static" {
   function_name = "parquet-reader-static"
   filename      = "../bin/build/buzz/buzz-parquet-reader-static.zip"
   handler       = "N/A"
-  memory_size   = 128
+  memory_size   = 2048
   timeout       = 10
   runtime       = "provided"
 

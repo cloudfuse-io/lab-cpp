@@ -31,7 +31,7 @@ static aws::lambda_runtime::invocation_response my_handler(
 
   int64_t chunck_size { 250000 };
   for (auto file_name: file_names) {
-    int nb_parallel { 10 };
+    int nb_parallel { 20 };
     std::shared_ptr<arrow::io::RandomAccessFile> infile;
     PARQUET_ASSIGN_OR_THROW(
       infile, fs->OpenInputFile(file_name));
@@ -58,8 +58,7 @@ static aws::lambda_runtime::invocation_response my_handler(
     std::cout << "duration_ms:" << total_duration/1000 << "/speed_MBpS:" << chunck_size*nb_parallel/total_duration << std::endl;
   }
 
-  fs->GetMetrics()->Print("resp_duration_ms");
-  // fs->GetMetrics()->Print("dl_duration_ms");
+  fs->GetMetrics()->Print();
 
   return aws::lambda_runtime::invocation_response::success("Yessss!", "text/plain");
 }

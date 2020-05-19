@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <atomic>
 #include <condition_variable>
-#include <mutex>
 #include <sstream>
 #include <unordered_map>
 #include <utility>
@@ -94,8 +93,6 @@ using ::arrow::fs::internal::ToAwsString;
 using ::arrow::fs::internal::ToURLEncodedAwsString;
 
 const char* kS3DefaultRegion = "us-east-1";
-const auto ref_time = std::chrono::high_resolution_clock::now();
-
 static const char kSep = '/';
 
 namespace {
@@ -454,21 +451,13 @@ class ObjectInputFile : public io::RandomAccessFile {
 
     // Read the desired range of bytes
     S3Model::GetObjectResult result;
-    auto start_time = std::chrono::high_resolution_clock::now();
+    metrics_manager_->NewEvent("get_obj_start");
     RETURN_NOT_OK(GetObjectRange(client_, path_, position, nbytes, &result));
-    auto head_time = std::chrono::high_resolution_clock::now();
+    metrics_manager_->NewEvent("get_obj_head_end");
     auto& stream = result.GetBody();
     stream.read(reinterpret_cast<char*>(out), nbytes);
-    auto dl_time = std::chrono::high_resolution_clock::now();
+    metrics_manager_->NewEvent("get_obj_body_end");
 
-    auto resp_duration = std::chrono::duration_cast<std::chrono::milliseconds>(head_time - start_time).count();
-    auto dl_duration = std::chrono::duration_cast<std::chrono::milliseconds>(dl_time - head_time).count();
-    auto resp_absolute = std::chrono::duration_cast<std::chrono::milliseconds>(start_time - ref_time).count();
-    auto dl_absolute = std::chrono::duration_cast<std::chrono::milliseconds>(head_time - ref_time).count();
-
-    auto range = std::to_string(position) + "x" + std::to_string(nbytes);
-    metrics_manager_->AddMetric(MetricEvent{ resp_absolute, path_.key, range, "resp_duration_ms",  resp_duration });
-    metrics_manager_->AddMetric(MetricEvent{ dl_absolute, path_.key, range, "dl_duration_ms", dl_duration });
     // NOTE: the stream is a stringstream by default, there is no actual error
     // to check for.  However, stream.fail() may return true if EOF is reached.
     return stream.gcount();
@@ -1521,20 +1510,43 @@ std::shared_ptr<MetricsManager> S3FileSystem::GetMetrics() {
   return metrics_manager_;
 }
 
-void MetricsManager::Print(std::string type) const {
+void MetricsManager::Print() const {
   std::lock_guard<std::mutex> guard(metrics_mutex_);
-  std::cout << "metrics: " << std::endl;
-  for (auto metric: metrics_) {
-    if (metric.type == type) {
-      std::cout << metric.filename << "," << metric.range << "," << metric.time <<  "," << metric.value << std::endl;
+  std::map<std::thread::id,std::vector<arrow::fs::MetricEvent>> thread_map;
+  for (const auto & metric: metrics_) {
+    thread_map[metric.thread_id].push_back(metric);
+  }
+
+  std::multimap<int64_t,std::vector<arrow::fs::MetricEvent>> sorted_threads;
+  for (const auto& thread: thread_map) {
+    auto metric_events = thread.second;
+    std::sort(metric_events.begin(), metric_events.end(), [](MetricEvent const& a, MetricEvent const& b) -> bool {
+      return a.time < b.time;
+    });
+    auto first_time = std::chrono::duration_cast<std::chrono::milliseconds>(metric_events[0].time-ref_time).count();
+    sorted_threads.insert({first_time, metric_events});
+  }
+
+  for (const auto& thread: sorted_threads) {
+    std::cout << thread.second[0].thread_id;
+    auto previous_time = ref_time;
+    for(const auto& event: thread.second) {
+      std::cout << ",";
+      std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(event.time-previous_time).count();
+      previous_time = event.time;
     }
-    
+    std::cout << std::endl;
   }
 }
 
-Status MetricsManager::AddMetric(MetricEvent metric) {
+Status MetricsManager::NewEvent(std::string type) {
+  MetricEvent event {
+    std::chrono::high_resolution_clock::now(),
+    std::this_thread::get_id(),
+    type,
+  };
   std::lock_guard<std::mutex> guard(metrics_mutex_);
-  metrics_.push_back(metric);
+  metrics_.push_back(event);
   return Status::OK();
 }
 

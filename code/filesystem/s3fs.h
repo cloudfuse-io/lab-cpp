@@ -21,6 +21,7 @@
 #include <mutex>
 #include <string>
 #include <vector>
+#include <thread>
 
 #include "arrow/filesystem/filesystem.h"
 #include "arrow/util/macros.h"
@@ -83,21 +84,20 @@ struct ARROW_EXPORT S3Options {
 };
 
 struct ARROW_EXPORT MetricEvent {
-  int64_t time;
-  std::string filename;
-  std::string range;
+  std::chrono::_V2::system_clock::time_point time;
+  std::thread::id thread_id;
   std::string type;
-  int64_t value;
 };
 
 class ARROW_EXPORT MetricsManager {
   public:
-    void Print(const std::string type) const;
-    // Result<std::vector<MetricEvent>> Metrics();
-    Status AddMetric(MetricEvent metric);
+    void Print() const;
+    Status NewEvent(std::string type);
+
   private:
     mutable std::mutex metrics_mutex_;
     std::vector<MetricEvent> metrics_;
+    std::chrono::_V2::system_clock::time_point ref_time = std::chrono::high_resolution_clock::now();
 };
 
 /// S3-backed FileSystem implementation.

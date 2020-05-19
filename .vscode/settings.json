@@ -5,6 +5,12 @@
     "${workspaceFolder}/code/**",
     "${workspaceFolder}/docker/arrow-cpp/arrow/cpp/**",
     "${workspaceFolder}/bin/build/**",
-    "/home/remito/install/include"
-  ]
+    "/home/remito/install/include",
+  ],
+  "files.exclude": {
+    "${workspaceFolder}/docker/arrow-cpp/arrow/cpp/src/arrow/filesystem": true
+  },
+  "search.exclude": {
+    "${workspaceFolder}/docker/arrow-cpp/arrow/cpp/src/arrow/filesystem": true
+  },
 }

@@ -27,7 +27,7 @@
 #include <iostream>
 
 auto get_duration(std::chrono::_V2::system_clock::time_point start, std::chrono::_V2::system_clock::time_point end) {
-  return std::chrono::duration_cast<std::chrono::microseconds>(end-start).count();
+  return std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
 }
 
 // helper
@@ -105,8 +105,11 @@ void read_single_column(std::unique_ptr<parquet::arrow::FileReader> reader, std:
   std::cout << std::endl;
 }
 
-// #3: Read an entire column chuck by chuck
-void read_single_column_parallel(std::unique_ptr<parquet::arrow::FileReader> reader, std::string col_name)
+// #3: Read an entire column chunck by chunck
+void read_single_column_parallel(
+  std::unique_ptr<parquet::arrow::FileReader> reader,
+  std::shared_ptr<arrow::fs::S3FileSystem> fs,
+  std::string col_name)
 {
   std::cout << "Reading first ColumnChunk of the first RowGroup"
             << std::endl;
@@ -121,9 +124,11 @@ void read_single_column_parallel(std::unique_ptr<parquet::arrow::FileReader> rea
   std::vector<std::future<std::shared_ptr<arrow::ChunkedArray>>> rg_futures;
   rg_futures.reserve(shared_reader->num_row_groups());
   for (int i=0; i<shared_reader->num_row_groups(); i++) {
-    auto fut = std::async(std::launch::async, [col_index, i, shared_reader](){
+    auto fut = std::async(std::launch::async, [col_index, i, shared_reader, fs](){
+      fs->GetMetrics()->NewEvent("read_start");
       std::shared_ptr<arrow::ChunkedArray> array;
       PARQUET_THROW_NOT_OK(shared_reader->RowGroup(i)->Column(col_index)->Read(&array));
+      fs->GetMetrics()->NewEvent("read_end");
       return std::move(array);
     });
     rg_futures.push_back(std::move(fut));
@@ -188,14 +193,11 @@ static aws::lambda_runtime::invocation_response my_handler(
   for(auto&& file_name: file_names) {
     std::cout << ">>>> file_name: " << file_name << std::endl;
     //// setup reader ////
-    std::shared_ptr<arrow::io::RandomAccessFile> infile;
-    PARQUET_ASSIGN_OR_THROW(
-        infile, fs->OpenInputFile(file_name));
+    PARQUET_ASSIGN_OR_THROW(auto infile, fs->OpenInputFile(file_name));
 
     std::unique_ptr<parquet::arrow::FileReader> reader;
     PARQUET_THROW_NOT_OK(
         parquet::arrow::OpenFile(infile, arrow::default_memory_pool(), &reader));
-    reader->set_use_threads(false);
 
     // std::cout << "reader->num_row_groups:" << reader->num_row_groups() << std::endl;
     // std::cout << "reader->num_rows:" << reader->parquet_reader()->metadata()->num_rows() << std::endl;
@@ -206,10 +208,10 @@ static aws::lambda_runtime::invocation_response my_handler(
     // read_whole_file(std::move(reader));
     // read_single_column_chunk(std::move(reader), "cpm");
     // read_single_column(std::move(reader), "cpm");
-    read_single_column_parallel(std::move(reader), "cpm");
+    read_single_column_parallel(std::move(reader), fs, "cpm");
   }
 
-  fs->GetMetrics()->Print("resp_duration_ms");
+  fs->GetMetrics()->Print();
 
   return aws::lambda_runtime::invocation_response::success("Yessss!", "text/plain");
 }

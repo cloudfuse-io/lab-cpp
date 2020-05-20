@@ -128,6 +128,7 @@ void read_single_column_parallel(
       fs->GetMetrics()->NewEvent("read_start");
       std::shared_ptr<arrow::ChunkedArray> array;
       PARQUET_THROW_NOT_OK(shared_reader->RowGroup(i)->Column(col_index)->Read(&array));
+      fs->GetDownloadScheduler()->NotifyProcessingSlot();
       fs->GetMetrics()->NewEvent("read_end");
       return std::move(array);
     });
@@ -198,6 +199,7 @@ static aws::lambda_runtime::invocation_response my_handler(
     std::unique_ptr<parquet::arrow::FileReader> reader;
     PARQUET_THROW_NOT_OK(
         parquet::arrow::OpenFile(infile, arrow::default_memory_pool(), &reader));
+    fs->GetDownloadScheduler()->NotifyProcessingSlot(); // here the footer gets downloaded
 
     // std::cout << "reader->num_row_groups:" << reader->num_row_groups() << std::endl;
     // std::cout << "reader->num_rows:" << reader->parquet_reader()->metadata()->num_rows() << std::endl;

@@ -451,14 +451,16 @@ class ObjectInputFile : public io::RandomAccessFile {
 
     // Read the desired range of bytes
     S3Model::GetObjectResult result;
-    download_scheduler_->Wait();
+    download_scheduler_->WaitDownloadSlot();
     metrics_manager_->NewEvent("get_obj_start");
     RETURN_NOT_OK(GetObjectRange(client_, path_, position, nbytes, &result));
     metrics_manager_->NewEvent("get_obj_head_end");
     auto& stream = result.GetBody();
     stream.read(reinterpret_cast<char*>(out), nbytes);
-    download_scheduler_->Notify();
     metrics_manager_->NewEvent("get_obj_body_end");
+    download_scheduler_->NotifyDownloadSlot();
+    download_scheduler_->WaitProcessingSlot();
+    metrics_manager_->NewEvent("start_processing");
 
     // NOTE: the stream is a stringstream by default, there is no actual error
     // to check for.  However, stream.fail() may return true if EOF is reached.
@@ -1514,6 +1516,10 @@ std::shared_ptr<MetricsManager> S3FileSystem::GetMetrics() {
   return metrics_manager_;
 }
 
+std::shared_ptr<DownloadScheduler> S3FileSystem::GetDownloadScheduler() {
+  return download_scheduler_;
+}
+
 void MetricsManager::Print() const {
   std::lock_guard<std::mutex> guard(metrics_mutex_);
   std::map<std::thread::id,std::vector<arrow::fs::MetricEvent>> thread_map;
@@ -1554,19 +1560,39 @@ Status MetricsManager::NewEvent(std::string type) {
   return Status::OK();
 }
 
-Status DownloadScheduler::Wait() {
+Status DownloadScheduler::WaitDownloadSlot() {
   std::unique_lock<std::mutex> lk(concurrent_dl_mutex_);
   concurrent_dl_cv_.wait(lk, [this]{ return concurrent_dl_ < 8; });
   ++concurrent_dl_;
   return Status::OK();
 }
 
-Status DownloadScheduler::Notify() {
+Status DownloadScheduler::NotifyDownloadSlot() {
   {
     std::unique_lock<std::mutex> lk(concurrent_dl_mutex_);
-    --concurrent_dl_;
+    if (concurrent_dl_ > 0) {
+      --concurrent_dl_;
+    }
   }
-  concurrent_dl_cv_.notify_all();
+  concurrent_dl_cv_.notify_one();
+  return Status::OK();
+}
+
+Status DownloadScheduler::WaitProcessingSlot() {
+  std::unique_lock<std::mutex> lk(concurrent_proc_mutex_);
+  concurrent_proc_cv_.wait(lk, [this]{ return concurrent_proc_ < 1; });
+  ++concurrent_proc_;
+  return Status::OK();
+}
+
+Status DownloadScheduler::NotifyProcessingSlot() {
+  {
+    std::unique_lock<std::mutex> lk(concurrent_proc_mutex_);
+    if (concurrent_proc_ > 0) {
+      --concurrent_proc_;
+    }
+  }
+  concurrent_proc_cv_.notify_one();
   return Status::OK();
 }
 

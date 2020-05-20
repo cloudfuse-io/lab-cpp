@@ -8,9 +8,9 @@
     "/home/remito/install/include",
   ],
   "files.exclude": {
-    "${workspaceFolder}/docker/arrow-cpp/arrow/cpp/src/arrow/filesystem": true
+    "${workspaceFolder}/docker/arrow-cpp/arrow/cpp/src/arrow/filesystem/**": true
   },
   "search.exclude": {
-    "${workspaceFolder}/docker/arrow-cpp/arrow/cpp/src/arrow/filesystem": true
+    "${workspaceFolder}/docker/arrow-cpp/arrow/cpp/src/arrow/filesystem/**": true
   },
 }

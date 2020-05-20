@@ -103,13 +103,18 @@ class ARROW_EXPORT MetricsManager {
 
 class ARROW_EXPORT DownloadScheduler {
   public:
-    Status Wait();
-    Status Notify();
+    Status WaitDownloadSlot();
+    Status NotifyDownloadSlot();
+    Status WaitProcessingSlot();
+    Status NotifyProcessingSlot();
 
   private:
     std::mutex concurrent_dl_mutex_;
     std::condition_variable concurrent_dl_cv_;
     int16_t concurrent_dl_ = 0;
+    std::mutex concurrent_proc_mutex_;
+    std::condition_variable concurrent_proc_cv_;
+    int16_t concurrent_proc_ = 0;
 };
 
 /// S3-backed FileSystem implementation.
@@ -170,6 +175,7 @@ class ARROW_EXPORT S3FileSystem : public FileSystem {
       const std::string& path) override;
   
   std::shared_ptr<MetricsManager> GetMetrics();
+  std::shared_ptr<DownloadScheduler> GetDownloadScheduler();
 
   /// Create a S3FileSystem instance from the given options.
   static Result<std::shared_ptr<S3FileSystem>> Make(const S3Options& options);

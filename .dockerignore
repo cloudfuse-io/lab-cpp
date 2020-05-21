@@ -1,2 +1,4 @@
 bin/
 infra/
+Makefile
+README.md

@@ -16,6 +16,7 @@ module "parquet-reader-static" {
   environment = {
     MAX_CONCURRENT_DL: 8
     MAX_CONCURRENT_PROC: 1
+    COLUMN_NAME: "href"
   }
 }
 

@@ -45,8 +45,9 @@ services:
     environment:
       AWS_ACCESS_KEY_ID: minio
       AWS_SECRET_ACCESS_KEY: minio123
-      MAX_CONCURRENT_DL: 8
+      MAX_CONCURRENT_DL: 4
       MAX_CONCURRENT_PROC: 1
+      COLUMN_NAME: auctionId
     depends_on:
       proxy:
         condition: service_healthy

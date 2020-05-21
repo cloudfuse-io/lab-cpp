@@ -1,6 +1,6 @@
 find_package(aws-lambda-runtime)
 
-add_library (s3fs STATIC filesystem/s3fs.cc filesystem/s3fs.h)
+add_library (s3fs STATIC filesystem/s3fs-forked.cc filesystem/s3fs-forked.h)
 target_include_directories(s3fs PUBLIC filesystem)
 
 set(BUZZ_TARGET "buzz-${BUZZ_BUILD_FILE}-${BUZZ_BUILD_TYPE}")

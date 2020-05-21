@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "s3fs.h"
+#include "s3fs-forked.h"
 
 #include <algorithm>
 #include <atomic>
@@ -476,6 +476,7 @@ class ObjectInputFile : public io::RandomAccessFile {
     }
 
     // Read the desired range of bytes
+    metrics_manager_->AddRead(nbytes);
     download_scheduler_->WaitDownloadSlot();
     metrics_manager_->NewEvent("get_obj_start");
     RETURN_NOT_OK(GetObjectRange(client_, path_, position, nbytes, out));
@@ -1528,10 +1529,11 @@ std::shared_ptr<DownloadScheduler> S3FileSystem::GetDownloadScheduler() {
 }
 
 void MetricsManager::Print() const {
+  // event timing stats
   std::lock_guard<std::mutex> guard(metrics_mutex_);
   std::map<std::thread::id,std::vector<arrow::fs::MetricEvent>> thread_map;
-  for (const auto & metric: metrics_) {
-    thread_map[metric.thread_id].push_back(metric);
+  for (const auto & event: events_) {
+    thread_map[event.thread_id].push_back(event);
   }
 
   std::multimap<int64_t,std::vector<arrow::fs::MetricEvent>> sorted_threads;
@@ -1554,6 +1556,13 @@ void MetricsManager::Print() const {
     }
     std::cout << std::endl;
   }
+
+  // size stats
+  auto total_dl = 0;
+  for (auto dl: reads_) {
+    total_dl += dl;
+  }
+  std::cout << "nb_dl," << reads_.size() << ",bytes_dl," << total_dl << std::endl;
 }
 
 Status MetricsManager::NewEvent(std::string type) {
@@ -1563,7 +1572,13 @@ Status MetricsManager::NewEvent(std::string type) {
     type,
   };
   std::lock_guard<std::mutex> guard(metrics_mutex_);
-  metrics_.push_back(event);
+  events_.push_back(event);
+  return Status::OK();
+}
+
+Status MetricsManager::AddRead(int64_t read_size) {
+  std::lock_guard<std::mutex> guard(metrics_mutex_);
+  reads_.push_back(read_size);
   return Status::OK();
 }
 

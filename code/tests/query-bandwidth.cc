@@ -1,6 +1,6 @@
 
 #include <arrow/api.h>
-#include "s3fs.h"
+#include "s3fs-forked.h"
 #include <arrow/compute/api.h>
 #include <arrow/io/api.h>
 #include <aws/lambda-runtime/runtime.h>

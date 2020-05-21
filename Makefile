@@ -15,6 +15,7 @@ ask-target:
 
 bin-folder:
 	@mkdir -p bin/build-amznlinux1
+	@mkdir -p bin/build-bench
 
 ## build commands
 build-lambda-runtime-cpp:
@@ -29,6 +30,10 @@ arrow-cpp-build-image: bin-folder build-lambda-runtime-cpp build-aws-sdk-cpp
 	git submodule update --init
 	docker build -f docker/arrow-cpp/Dockerfile -t buzz-arrow-cpp-build .
 	# docker run -it buzz-arrow-cpp-build bash
+
+arrow-cpp-bench-image: bin-folder
+	docker build -t buzz-arrow-cpp-bench -f docker/arrow-cpp/benchmarks.Dockerfile .
+	docker run --rm -it -v ${CURDIR}/bin/build-bench:/tmp/ buzz-arrow-cpp-bench
 
 build-query-bandwidth: arrow-cpp-build-image
 	docker run --rm -v ${CURDIR}/bin/build-amznlinux1:/source/cpp/build -e BUILD_FILE=query-bandwidth -e BUILD_TYPE=static buzz-arrow-cpp-build

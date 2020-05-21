@@ -16,7 +16,7 @@
 // under the License.
 
 #include <arrow/api.h>
-#include "s3fs.h"
+#include "s3fs-forked.h"
 #include <arrow/compute/api.h>
 #include <arrow/io/api.h>
 #include <aws/lambda-runtime/runtime.h>
@@ -111,16 +111,11 @@ void read_single_column_parallel(
   std::shared_ptr<arrow::fs::S3FileSystem> fs,
   std::string col_name)
 {
-  std::cout << "Reading first ColumnChunk of the first RowGroup"
-            << std::endl;
-
   int col_index;
   reader = get_column(std::move(reader), col_name, col_index);
-  std::cout << "id of " << col_name << " : " << col_index << std::endl;
   
   // start rowgroup read at the same time
   std::shared_ptr<parquet::arrow::FileReader> shared_reader(std::move(reader));
-  auto t1 = std::chrono::high_resolution_clock::now();
   std::vector<std::future<std::shared_ptr<arrow::ChunkedArray>>> rg_futures;
   rg_futures.reserve(shared_reader->num_row_groups());
   for (int i=0; i<shared_reader->num_row_groups(); i++) {
@@ -146,22 +141,15 @@ void read_single_column_parallel(
   std::shared_ptr<arrow::Schema> full_schema;
   PARQUET_THROW_NOT_OK(shared_reader->GetSchema(&full_schema));
   auto schema = arrow::schema({full_schema->fields()[col_index]}, full_schema->metadata());
-  std::cout << "schema->ToString(true):" << schema->ToString(true) << std::endl;
   // merge rowgroups back into a table
   auto chuncked_column = std::make_shared<arrow::ChunkedArray>(array_vect);
   auto table = arrow::Table::Make(schema, {chuncked_column});
-  auto t2 = std::chrono::high_resolution_clock::now();
-  std::cout << "read duration: " << get_duration(t1, t2) << std::endl;
-  std::cout << "table->num_rows:" << table->num_rows() << std::endl;
-  std::cout << "table->num_columns:" << table->num_columns() << std::endl;
-  // compute sum with kernel
-  auto function_context = arrow::compute::FunctionContext();
-  auto column_datum = arrow::compute::Datum(table->GetColumnByName("cpm"));
-  arrow::compute::Datum result_datum;
-  PARQUET_THROW_NOT_OK(arrow::compute::Sum(&function_context, column_datum, &result_datum));
-  auto t3 = std::chrono::high_resolution_clock::now();
-  std::cout << "sum duration: " << get_duration(t2, t3) << std::endl;
-  std::cout << "sum:" << result_datum.scalar()->ToString() << std::endl;
+  // // compute sum with kernel
+  // auto function_context = arrow::compute::FunctionContext();
+  // auto column_datum = arrow::compute::Datum(table->GetColumnByName("cpm"));
+  // arrow::compute::Datum result_datum;
+  // PARQUET_THROW_NOT_OK(arrow::compute::Sum(&function_context, column_datum, &result_datum));
+  // std::cout << "sum:" << result_datum.scalar()->ToString() << std::endl;
   
   std::cout << std::endl;
 }
@@ -210,7 +198,7 @@ static aws::lambda_runtime::invocation_response my_handler(
     // read_whole_file(std::move(reader));
     // read_single_column_chunk(std::move(reader), "cpm");
     // read_single_column(std::move(reader), "cpm");
-    read_single_column_parallel(std::move(reader), fs, "cpm");
+    read_single_column_parallel(std::move(reader), fs, getenv("COLUMN_NAME"));
   }
 
   fs->GetMetrics()->Print();

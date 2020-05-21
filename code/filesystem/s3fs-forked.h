@@ -94,10 +94,12 @@ class ARROW_EXPORT MetricsManager {
   public:
     void Print() const;
     Status NewEvent(std::string type);
+    Status AddRead(int64_t read_size);
 
   private:
     mutable std::mutex metrics_mutex_;
-    std::vector<MetricEvent> metrics_;
+    std::vector<MetricEvent> events_;
+    std::vector<int64_t> reads_;
     std::chrono::_V2::system_clock::time_point ref_time = std::chrono::high_resolution_clock::now();
 };
 

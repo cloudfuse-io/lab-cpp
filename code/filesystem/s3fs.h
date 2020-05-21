@@ -103,6 +103,7 @@ class ARROW_EXPORT MetricsManager {
 
 class ARROW_EXPORT DownloadScheduler {
   public:
+  DownloadScheduler();
     Status WaitDownloadSlot();
     Status NotifyDownloadSlot();
     Status WaitProcessingSlot();
@@ -112,9 +113,11 @@ class ARROW_EXPORT DownloadScheduler {
     std::mutex concurrent_dl_mutex_;
     std::condition_variable concurrent_dl_cv_;
     int16_t concurrent_dl_ = 0;
+    int16_t max_concurrent_dl_ = 1;
     std::mutex concurrent_proc_mutex_;
     std::condition_variable concurrent_proc_cv_;
     int16_t concurrent_proc_ = 0;
+    int16_t max_concurrent_proc_ = 1;
 };
 
 /// S3-backed FileSystem implementation.

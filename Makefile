@@ -14,7 +14,7 @@ ask-target:
 	@echo "Lets deploy ${GIT_REVISION} in ${STAGE} with profile ${PROFILE}..."
 
 bin-folder:
-	@mkdir -p bin/build
+	@mkdir -p bin/build-amznlinux1
 
 ## build commands
 build-lambda-runtime-cpp:
@@ -31,24 +31,24 @@ arrow-cpp-build-image: bin-folder build-lambda-runtime-cpp build-aws-sdk-cpp
 	# docker run -it buzz-arrow-cpp-build bash
 
 build-query-bandwidth: arrow-cpp-build-image
-	docker run --rm -v ${CURDIR}/bin/build:/source/cpp/build -e BUILD_FILE=query-bandwidth -e BUILD_TYPE=static buzz-arrow-cpp-build
+	docker run --rm -v ${CURDIR}/bin/build-amznlinux1:/source/cpp/build -e BUILD_FILE=query-bandwidth -e BUILD_TYPE=static buzz-arrow-cpp-build
 
 build-parquet-reader: arrow-cpp-build-image
-	docker run --rm -v ${CURDIR}/bin/build:/source/cpp/build -e BUILD_FILE=parquet-reader -e BUILD_TYPE=static buzz-arrow-cpp-build
+	docker run --rm -v ${CURDIR}/bin/build-amznlinux1:/source/cpp/build -e BUILD_FILE=parquet-reader -e BUILD_TYPE=static buzz-arrow-cpp-build
 
 build-mem-alloc: arrow-cpp-build-image
-	docker run --rm -v ${CURDIR}/bin/build:/source/cpp/build -e BUILD_FILE=mem-alloc -e BUILD_TYPE=static buzz-arrow-cpp-build
+	docker run --rm -v ${CURDIR}/bin/build-amznlinux1:/source/cpp/build -e BUILD_FILE=mem-alloc -e BUILD_TYPE=static buzz-arrow-cpp-build
 
 build-simd-support: arrow-cpp-build-image
-	docker run --rm -v ${CURDIR}/bin/build:/source/cpp/build -e BUILD_FILE=simd-support -e BUILD_TYPE=static buzz-arrow-cpp-build
+	docker run --rm -v ${CURDIR}/bin/build-amznlinux1:/source/cpp/build -e BUILD_FILE=simd-support -e BUILD_TYPE=static buzz-arrow-cpp-build
 
 ## deployment commands
 
 compose-clean-run:
-	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.yaml build
-	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.yaml up --abort-on-container-exit
+	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.yaml build
+	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.yaml up --abort-on-container-exit
 	docker logs amznlinux1-run-cpp_test_1
-	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.yaml rm -fsv
+	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.yaml rm -fsv
 
 run-local-query-bandwidth: build-query-bandwidth
 	docker build \
@@ -56,8 +56,8 @@ run-local-query-bandwidth: build-query-bandwidth
 	  --build-arg BUILD_TYPE=static \
 	  -f docker/amznlinux1-run-cpp/runtime.Dockerfile \
 	  -t buzz-amznlinux1-run-cpp \
-	  bin/build/buzz
-	make compose-clean-run
+	  bin/build-amznlinux1/buzz
+	COMPOSE_TYPE=minio make compose-clean-run
 
 run-local-parquet-reader: build-parquet-reader
 	docker build \
@@ -65,8 +65,8 @@ run-local-parquet-reader: build-parquet-reader
 	  --build-arg BUILD_TYPE=static \
 	  -f docker/amznlinux1-run-cpp/runtime.Dockerfile \
 	  -t buzz-amznlinux1-run-cpp \
-	  bin/build/buzz
-	make compose-clean-run
+	  bin/build-amznlinux1/buzz
+	COMPOSE_TYPE=minio make compose-clean-run
 
 run-local-mem-alloc: build-mem-alloc
 	docker build \
@@ -74,8 +74,8 @@ run-local-mem-alloc: build-mem-alloc
 	  --build-arg BUILD_TYPE=static \
 	  -f docker/amznlinux1-run-cpp/runtime.Dockerfile \
 	  -t buzz-amznlinux1-run-cpp \
-	  bin/build/buzz
-	make compose-clean-run
+	  bin/build-amznlinux1/buzz
+	COMPOSE_TYPE=standalone make compose-clean-run
 
 run-local-simd-support: build-simd-support
 	docker build \
@@ -83,8 +83,8 @@ run-local-simd-support: build-simd-support
 	  --build-arg BUILD_TYPE=static \
 	  -f docker/amznlinux1-run-cpp/runtime.Dockerfile \
 	  -t buzz-amznlinux1-run-cpp \
-	  bin/build/buzz
-	make compose-clean-run
+	  bin/build-amznlinux1/buzz
+	COMPOSE_TYPE=standalone make compose-clean-run
 
 # temp command:
 force-deploy-dev: build-query-bandwidth build-parquet-reader build-mem-alloc build-simd-support

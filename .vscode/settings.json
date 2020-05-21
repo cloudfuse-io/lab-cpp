@@ -4,7 +4,7 @@
   "C_Cpp.default.includePath": [
     "${workspaceFolder}/code/**",
     "${workspaceFolder}/docker/arrow-cpp/arrow/cpp/**",
-    "${workspaceFolder}/bin/build/**",
+    "${workspaceFolder}/bin/build-amznlinux1/**",
     "/home/remito/install/include",
   ],
   "files.exclude": {

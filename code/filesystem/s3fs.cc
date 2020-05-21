@@ -356,13 +356,39 @@ std::string FormatRange(int64_t start, int64_t length) {
   return ss.str();
 }
 
+// A non-copying iostream.
+// See https://stackoverflow.com/questions/35322033/aws-c-sdk-uploadpart-times-out
+// https://stackoverflow.com/questions/13059091/creating-an-input-stream-from-constant-memory
+class StringViewStream : Aws::Utils::Stream::PreallocatedStreamBuf, public std::iostream {
+ public:
+  StringViewStream(const void* data, int64_t nbytes)
+      : Aws::Utils::Stream::PreallocatedStreamBuf(
+            reinterpret_cast<unsigned char*>(const_cast<void*>(data)),
+            static_cast<size_t>(nbytes)),
+        std::iostream(this) {}
+};
+
+// By default, the AWS SDK reads object data into an auto-growing StringStream.
+// To avoid copies, read directly into our preallocated buffer instead.
+// See https://github.com/aws/aws-sdk-cpp/issues/64 for an alternative but
+// functionally similar recipe.
+Aws::IOStreamFactory AwsWriteableStreamFactory(void* data, int64_t nbytes) {
+  return [=]() { return new StringViewStream(data, nbytes); };
+}
+
 Status GetObjectRange(Aws::S3::S3Client* client, const S3Path& path, int64_t start,
-                      int64_t length, S3Model::GetObjectResult* out) {
+                      int64_t length, void* out) {
   S3Model::GetObjectRequest req;
   req.SetBucket(ToAwsString(path.bucket));
   req.SetKey(ToAwsString(path.key));
   req.SetRange(ToAwsString(FormatRange(start, length)));
-  ARROW_AWS_ASSIGN_OR_RAISE(*out, client->GetObject(req));
+  req.SetResponseStreamFactory(AwsWriteableStreamFactory(out, length));
+  ARROW_AWS_ASSIGN_OR_RAISE(auto object_outcome, client->GetObject(req));
+  object_outcome.GetBody().ignore(length);
+  if (object_outcome.GetBody().gcount() != length) {
+    return Status::IOError("Read ", object_outcome.GetBody().gcount(),
+    " bytes instead of ", length);
+  }
   return Status::OK();
 }
 
@@ -450,21 +476,15 @@ class ObjectInputFile : public io::RandomAccessFile {
     }
 
     // Read the desired range of bytes
-    S3Model::GetObjectResult result;
     download_scheduler_->WaitDownloadSlot();
     metrics_manager_->NewEvent("get_obj_start");
-    RETURN_NOT_OK(GetObjectRange(client_, path_, position, nbytes, &result));
-    metrics_manager_->NewEvent("get_obj_head_end");
-    auto& stream = result.GetBody();
-    stream.read(reinterpret_cast<char*>(out), nbytes);
-    metrics_manager_->NewEvent("get_obj_body_end");
+    RETURN_NOT_OK(GetObjectRange(client_, path_, position, nbytes, out));
+    metrics_manager_->NewEvent("get_obj_end");
     download_scheduler_->NotifyDownloadSlot();
     download_scheduler_->WaitProcessingSlot();
     metrics_manager_->NewEvent("start_processing");
 
-    // NOTE: the stream is a stringstream by default, there is no actual error
-    // to check for.  However, stream.fail() may return true if EOF is reached.
-    return stream.gcount();
+    return nbytes;
   }
 
   Result<std::shared_ptr<Buffer>> ReadAt(int64_t position, int64_t nbytes) override {
@@ -504,19 +524,6 @@ class ObjectInputFile : public io::RandomAccessFile {
   int64_t content_length_ = -1;
   std::shared_ptr<MetricsManager> metrics_manager_;
   std::shared_ptr<DownloadScheduler> download_scheduler_;
-};
-
-// A non-copying istream.
-// See https://stackoverflow.com/questions/35322033/aws-c-sdk-uploadpart-times-out
-// https://stackoverflow.com/questions/13059091/creating-an-input-stream-from-constant-memory
-
-class StringViewStream : Aws::Utils::Stream::PreallocatedStreamBuf, public std::iostream {
- public:
-  StringViewStream(const void* data, int64_t nbytes)
-      : Aws::Utils::Stream::PreallocatedStreamBuf(
-            reinterpret_cast<unsigned char*>(const_cast<void*>(data)),
-            static_cast<size_t>(nbytes)),
-        std::iostream(this) {}
 };
 
 // Minimum size for each part of a multipart upload, except for the last part.
@@ -1560,9 +1567,22 @@ Status MetricsManager::NewEvent(std::string type) {
   return Status::OK();
 }
 
+int16_t GetEnvInt(const char *name, int16_t def) {
+  auto raw_var = getenv(name);
+  if (raw_var == nullptr) {
+    return def;
+  }
+  return std::stoi(raw_var);
+}
+
+DownloadScheduler::DownloadScheduler() {
+  max_concurrent_dl_ = GetEnvInt("MAX_CONCURRENT_DL", max_concurrent_dl_);
+  max_concurrent_proc_ = GetEnvInt("MAX_CONCURRENT_PROC", max_concurrent_proc_);
+}
+
 Status DownloadScheduler::WaitDownloadSlot() {
   std::unique_lock<std::mutex> lk(concurrent_dl_mutex_);
-  concurrent_dl_cv_.wait(lk, [this]{ return concurrent_dl_ < 8; });
+  concurrent_dl_cv_.wait(lk, [this]{ return concurrent_dl_ < max_concurrent_dl_; });
   ++concurrent_dl_;
   return Status::OK();
 }
@@ -1580,7 +1600,7 @@ Status DownloadScheduler::NotifyDownloadSlot() {
 
 Status DownloadScheduler::WaitProcessingSlot() {
   std::unique_lock<std::mutex> lk(concurrent_proc_mutex_);
-  concurrent_proc_cv_.wait(lk, [this]{ return concurrent_proc_ < 1; });
+  concurrent_proc_cv_.wait(lk, [this]{ return concurrent_proc_ < max_concurrent_proc_; });
   ++concurrent_proc_;
   return Status::OK();
 }

@@ -1,0 +1,8 @@
+version: '2.4'
+
+services:
+  test:
+    image: buzz-amznlinux1-run-cpp
+    volumes:
+      - ~/.aws:/root/.aws
+    cpus: 1

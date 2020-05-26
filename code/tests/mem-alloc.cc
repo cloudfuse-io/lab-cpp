@@ -27,29 +27,35 @@ static aws::lambda_runtime::invocation_response my_handler(
   )
 {
   std::cout << "backend_name:" << arrow::default_memory_pool()->backend_name() << std::endl;
-  std::cout << "SHRINKING PAGESIZES" << std::endl;
+  std::cout << "GROWING IN TWO PHASES 2MB" << std::endl;
 
-  // {
-  //   auto start_time = std::chrono::high_resolution_clock::now();
-  //   std::vector<std::shared_ptr<arrow::Buffer>> buffers;
-  //   std::shared_ptr<arrow::Buffer> buf;
-  //   PARQUET_ASSIGN_OR_THROW(buf, arrow::AllocateBuffer(GetEnvInt("MEGA_ALLOCATED",1000)*1024*1024, arrow::default_memory_pool()));
-  //   memset(buf->mutable_data(), 0, static_cast<size_t>(buf->size()));
-  //   buffers.push_back(buf);
-  //   auto end_time = std::chrono::high_resolution_clock::now();
-  //   std::cout << "duration:" << get_duration(start_time,end_time) << std::endl;
-  //   std::cout << "bytes_allocated:" << arrow::default_memory_pool()->bytes_allocated() << std::endl;
-  //   std::cout << "max_memory:" << arrow::default_memory_pool()->max_memory() << std::endl;
-  // }
   for (int i=1; i<=10; i++) {
     std::cout << i << ",";
     std::cout << arrow::default_memory_pool()->bytes_allocated() << ",";
     auto start_time = std::chrono::high_resolution_clock::now();
     {
       std::vector<std::shared_ptr<arrow::Buffer>> buffers;
-      for (int j=0; j<GetEnvInt("MEGA_ALLOCATED",1000)/i; j++) {
+      for (int j=0; j<GetEnvInt("MEGA_ALLOCATED",1000)/2; j++) {
         std::shared_ptr<arrow::Buffer> buf;
-        PARQUET_ASSIGN_OR_THROW(buf, arrow::AllocateBuffer(i*1024*1024, arrow::default_memory_pool()));
+        PARQUET_ASSIGN_OR_THROW(buf, arrow::AllocateBuffer(2*1024*1024, arrow::default_memory_pool()));
+        memset(buf->mutable_data(), i, static_cast<size_t>(buf->size()));
+        buffers.push_back(buf);
+      }
+    }
+    auto end_time = std::chrono::high_resolution_clock::now();
+    std::cout << get_duration(start_time,end_time) << ",";
+    std::cout << arrow::default_memory_pool()->bytes_allocated() << ",";
+    std::cout << arrow::default_memory_pool()->max_memory() << std::endl;
+  }
+  for (int i=1; i<=10; i++) {
+    std::cout << i << ",";
+    std::cout << arrow::default_memory_pool()->bytes_allocated() << ",";
+    auto start_time = std::chrono::high_resolution_clock::now();
+    {
+      std::vector<std::shared_ptr<arrow::Buffer>> buffers;
+      for (int j=0; j<GetEnvInt("MEGA_ALLOCATED",1000)*2/2; j++) {
+        std::shared_ptr<arrow::Buffer> buf;
+        PARQUET_ASSIGN_OR_THROW(buf, arrow::AllocateBuffer(2*1024*1024, arrow::default_memory_pool()));
         memset(buf->mutable_data(), i, static_cast<size_t>(buf->size()));
         buffers.push_back(buf);
       }

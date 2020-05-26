@@ -73,10 +73,11 @@ run-local-parquet-reader: build-parquet-reader
 
 run-local-mem-alloc: build-mem-alloc
 	# VALGRIND_CMD="valgrind --leak-check=yes"
-	VALGRIND_CMD="valgrind --pages-as-heap=yes --tool=massif" \
+	# VALGRIND_CMD="valgrind --pages-as-heap=yes --tool=massif"
+	VALGRIND_CMD="" \
 	COMPOSE_TYPE=standalone \
 	BUILD_FILE=mem-alloc \
-	MEGA_ALLOCATED=1000 \
+	MEGA_ALLOCATED=100 \
 	make compose-clean-run
 
 run-local-simd-support: build-simd-support

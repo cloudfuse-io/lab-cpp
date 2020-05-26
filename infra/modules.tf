@@ -48,7 +48,7 @@ module "mem-alloc-static" {
 
   additional_policies = [aws_iam_policy.scanner-additional-policy.arn]
   environment = {
-    MEGA_ALLOCATED = 1000
+    MEGA_ALLOCATED = 100
   }
 }
 

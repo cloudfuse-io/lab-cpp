@@ -48,7 +48,7 @@ module "mem-alloc-static" {
 
   additional_policies = [aws_iam_policy.scanner-additional-policy.arn]
   environment = {
-    MOCK = "mock"
+    MEGA_ALLOCATED = 1000
   }
 }
 

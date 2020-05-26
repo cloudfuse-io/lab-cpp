@@ -52,44 +52,38 @@ build-simd-support: arrow-cpp-build-image
 compose-clean-run:
 	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.yaml build
 	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.yaml up --abort-on-container-exit
-	docker logs amznlinux1-run-cpp_test_1
+	docker logs amznlinux1-run-cpp_lambda-emulator_1
+	docker cp amznlinux1-run-cpp_lambda-emulator_1:/massif.out.1 massif.out.1
 	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.yaml rm -fsv
 
 run-local-query-bandwidth: build-query-bandwidth
-	docker build \
-	  --build-arg BUILD_FILE=query-bandwidth \
-	  --build-arg BUILD_TYPE=static \
-	  -f docker/amznlinux1-run-cpp/runtime.Dockerfile \
-	  -t buzz-amznlinux1-run-cpp \
-	  bin/build-amznlinux1/buzz
-	COMPOSE_TYPE=minio make compose-clean-run
+	VALGRIND_CMD="" \
+	COMPOSE_TYPE=minio \
+	BUILD_FILE=query-bandwidth \
+	make compose-clean-run
 
 run-local-parquet-reader: build-parquet-reader
-	docker build \
-	  --build-arg BUILD_FILE=parquet-reader \
-	  --build-arg BUILD_TYPE=static \
-	  -f docker/amznlinux1-run-cpp/runtime.Dockerfile \
-	  -t buzz-amznlinux1-run-cpp \
-	  bin/build-amznlinux1/buzz
-	COMPOSE_TYPE=minio make compose-clean-run
+	VALGRIND_CMD="" \
+	COMPOSE_TYPE=minio \
+	BUILD_FILE=parquet-reader \
+	MAX_CONCURRENT_DL=8 \
+	MAX_CONCURRENT_PROC=1 \
+	COLUMN_NAME=device \
+	make compose-clean-run
 
 run-local-mem-alloc: build-mem-alloc
-	docker build \
-	  --build-arg BUILD_FILE=mem-alloc \
-	  --build-arg BUILD_TYPE=static \
-	  -f docker/amznlinux1-run-cpp/runtime.Dockerfile \
-	  -t buzz-amznlinux1-run-cpp \
-	  bin/build-amznlinux1/buzz
-	COMPOSE_TYPE=standalone make compose-clean-run
+	# VALGRIND_CMD="valgrind --leak-check=yes"
+	VALGRIND_CMD="valgrind --pages-as-heap=yes --tool=massif" \
+	COMPOSE_TYPE=standalone \
+	BUILD_FILE=mem-alloc \
+	MEGA_ALLOCATED=1000 \
+	make compose-clean-run
 
 run-local-simd-support: build-simd-support
-	docker build \
-	  --build-arg BUILD_FILE=simd-support \
-	  --build-arg BUILD_TYPE=static \
-	  -f docker/amznlinux1-run-cpp/runtime.Dockerfile \
-	  -t buzz-amznlinux1-run-cpp \
-	  bin/build-amznlinux1/buzz
-	COMPOSE_TYPE=standalone make compose-clean-run
+	VALGRIND_CMD="" \
+	COMPOSE_TYPE=standalone \
+	BUILD_FILE=simd-support \
+	make compose-clean-run
 
 # temp command:
 force-deploy-dev: build-query-bandwidth build-parquet-reader build-mem-alloc build-simd-support

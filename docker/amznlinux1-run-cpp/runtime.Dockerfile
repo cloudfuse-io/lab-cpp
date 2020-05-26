@@ -1,9 +1,9 @@
 FROM amazonlinux:1
 
-RUN yum update -y && yum install -y unzip
+RUN yum update -y && yum install -y unzip valgrind
 
 ARG BUILD_FILE
-ARG BUILD_TYPE
+ARG BUILD_TYPE=static
 
 COPY buzz-${BUILD_FILE}-${BUILD_TYPE}.zip .
 # COPY buzz-test1-shared.zip .
@@ -15,4 +15,4 @@ ENV IS_LOCAL true
 RUN unzip buzz-${BUILD_FILE}-${BUILD_TYPE}.zip &&\
   mv bin/buzz-${BUILD_FILE}-${BUILD_TYPE} bin/exec
 
-ENTRYPOINT bin/exec N/A
+ENTRYPOINT ${VALGRIND_CMD} bin/exec N/A

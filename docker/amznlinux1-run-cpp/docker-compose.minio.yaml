@@ -37,17 +37,24 @@ services:
           - minio
       backend:
 
-  test:
+  lambda-emulator:
     image: buzz-amznlinux1-run-cpp
+    build:
+      context: ../../bin/build-amznlinux1/buzz
+      dockerfile: ../../../docker/amznlinux1-run-cpp/runtime.Dockerfile
+      args:
+        BUILD_FILE: ${BUILD_FILE}
     volumes:
       - ~/.aws:/root/.aws
     cpus: 1
+    mem_limit: 2048M
     environment:
       AWS_ACCESS_KEY_ID: minio
       AWS_SECRET_ACCESS_KEY: minio123
-      MAX_CONCURRENT_DL: 4
-      MAX_CONCURRENT_PROC: 1
-      COLUMN_NAME: auctionId
+      MAX_CONCURRENT_DL: ${MAX_CONCURRENT_DL}
+      MAX_CONCURRENT_PROC: ${MAX_CONCURRENT_PROC}
+      COLUMN_NAME: ${COLUMN_NAME}
+      VALGRIND_CMD: ${VALGRIND_CMD}
     depends_on:
       proxy:
         condition: service_healthy

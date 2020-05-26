@@ -150,8 +150,6 @@ void read_single_column_parallel(
   // arrow::compute::Datum result_datum;
   // PARQUET_THROW_NOT_OK(arrow::compute::Sum(&function_context, column_datum, &result_datum));
   // std::cout << "sum:" << result_datum.scalar()->ToString() << std::endl;
-  
-  std::cout << std::endl;
 }
 
 static aws::lambda_runtime::invocation_response my_handler(
@@ -185,8 +183,11 @@ static aws::lambda_runtime::invocation_response my_handler(
     PARQUET_ASSIGN_OR_THROW(auto infile, fs->OpenInputFile(file_name));
 
     std::unique_ptr<parquet::arrow::FileReader> reader;
-    PARQUET_THROW_NOT_OK(
-        parquet::arrow::OpenFile(infile, arrow::default_memory_pool(), &reader));
+    parquet::arrow::FileReaderBuilder builder;
+    auto properties = parquet::ArrowReaderProperties();
+    properties.set_read_dictionary(4, true);
+    PARQUET_THROW_NOT_OK(builder.Open(infile));
+    PARQUET_THROW_NOT_OK(builder.properties(properties)->Build(&reader));
     fs->GetDownloadScheduler()->NotifyProcessingSlot(); // here the footer gets downloaded
 
     // std::cout << "reader->num_row_groups:" << reader->num_row_groups() << std::endl;
@@ -200,6 +201,8 @@ static aws::lambda_runtime::invocation_response my_handler(
     // read_single_column(std::move(reader), "cpm");
     read_single_column_parallel(std::move(reader), fs, getenv("COLUMN_NAME"));
   }
+
+  std::cout << "arrow::default_memory_pool()->max_memory():" << arrow::default_memory_pool()->max_memory() << std::endl;
 
   fs->GetMetrics()->Print();
 

@@ -7,7 +7,7 @@ if [ "$1" = 'build' ]; then
     mkdir -p /source/cpp/build
     cd /source/cpp/build
     cmake .. -DCMAKE_BUILD_TYPE=Release \
-      -DARROW_CXXFLAGS="-ldl" \
+      -DARROW_CXXFLAGS="-ldl -g" \
       -DARROW_BUILD_SHARED=OFF \
       -DARROW_PARQUET=ON \
       -DARROW_S3=ON \

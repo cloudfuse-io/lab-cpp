@@ -11,21 +11,10 @@
 #include <iostream>
 #include <unordered_set>
 
-int64_t get_duration(std::chrono::_V2::system_clock::time_point start,
-                     std::chrono::_V2::system_clock::time_point end) {
-  return std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-}
+#include "various.h"
 
-int64_t GetEnvInt(const char* name, int64_t def) {
-  auto raw_var = getenv(name);
-  if (raw_var == nullptr) {
-    return def;
-  }
-  return std::stoi(raw_var);
-}
-
-size_t max_pages_est = GetEnvInt("MEGA_ALLOCATED", 1000) * 1024 / 4 * 10;
-std::unordered_set<uint32_t> allocated_pages(max_pages_est);
+static size_t max_pages_est = util::getenv_int("MEGA_ALLOCATED", 1000) * 1024 / 4 * 10;
+static std::unordered_set<uint32_t> allocated_pages(max_pages_est);
 
 static aws::lambda_runtime::invocation_response my_handler(
     aws::lambda_runtime::invocation_request const& req) {
@@ -40,14 +29,14 @@ static aws::lambda_runtime::invocation_response my_handler(
     uint32_t nb_true{0};
     {
       std::vector<std::shared_ptr<arrow::Buffer>> buffers;
-      for (int j = 0; j < GetEnvInt("MEGA_ALLOCATED", 1000); j++) {
+      for (int j = 0; j < util::getenv_int("MEGA_ALLOCATED", 1000); j++) {
         std::shared_ptr<arrow::Buffer> buf;
         auto start_time = std::chrono::high_resolution_clock::now();
         PARQUET_ASSIGN_OR_THROW(
             buf, arrow::AllocateBuffer(1024 * 1024, arrow::default_memory_pool()));
         memset(buf->mutable_data(), i, static_cast<size_t>(buf->size()));
         auto end_time = std::chrono::high_resolution_clock::now();
-        allocation_duration += get_duration(start_time, end_time);
+        allocation_duration += util::get_duration_ms(start_time, end_time);
         auto current_ptr_page = buf->mutable_address() / 4 / 1024;
         for (int i = 0; i < 1024 / 4; i++) {
           new_pages_allocated += allocated_pages.insert(current_ptr_page + i).second;
@@ -67,14 +56,14 @@ static aws::lambda_runtime::invocation_response my_handler(
     uint32_t new_pages_allocated{0};
     {
       std::vector<std::shared_ptr<arrow::Buffer>> buffers;
-      for (int j = 0; j < GetEnvInt("MEGA_ALLOCATED", 1000) * 2; j++) {
+      for (int j = 0; j < util::getenv_int("MEGA_ALLOCATED", 1000) * 2; j++) {
         std::shared_ptr<arrow::Buffer> buf;
         auto start_time = std::chrono::high_resolution_clock::now();
         PARQUET_ASSIGN_OR_THROW(
             buf, arrow::AllocateBuffer(1024 * 1024, arrow::default_memory_pool()));
         memset(buf->mutable_data(), i, static_cast<size_t>(buf->size()));
         auto end_time = std::chrono::high_resolution_clock::now();
-        allocation_duration += get_duration(start_time, end_time);
+        allocation_duration += util::get_duration_ms(start_time, end_time);
         auto current_ptr_page = buf->mutable_address() / 4 / 1024;
         for (int i = 0; i < 1024 / 4; i++) {
           new_pages_allocated += allocated_pages.insert(current_ptr_page + i).second;

@@ -23,6 +23,8 @@
 #include <unordered_map>
 #include <utility>
 
+#include "various.h"
+
 #ifdef _WIN32
 // Undefine preprocessor macros that interfere with AWS function / method names
 #ifdef GetMessage
@@ -387,7 +389,7 @@ Status GetObjectRange(Aws::S3::S3Client* client, const S3Path& path, int64_t sta
   object_outcome.GetBody().ignore(length);
   if (object_outcome.GetBody().gcount() != length) {
     return Status::IOError("Read ", object_outcome.GetBody().gcount(),
-    " bytes instead of ", length);
+                           " bytes instead of ", length);
   }
   return Status::OK();
 }
@@ -396,8 +398,12 @@ Status GetObjectRange(Aws::S3::S3Client* client, const S3Path& path, int64_t sta
 class ObjectInputFile : public io::RandomAccessFile {
  public:
   ObjectInputFile(Aws::S3::S3Client* client, const S3Path& path,
-                  std::shared_ptr<MetricsManager> metrics_manager, std::shared_ptr<DownloadScheduler> download_scheduler)
-      : client_(client), path_(path), metrics_manager_(metrics_manager), download_scheduler_(download_scheduler) {}
+                  std::shared_ptr<MetricsManager> metrics_manager,
+                  std::shared_ptr<DownloadScheduler> download_scheduler)
+      : client_(client),
+        path_(path),
+        metrics_manager_(metrics_manager),
+        download_scheduler_(download_scheduler) {}
 
   Status Init() {
     // Issue a HEAD Object to get the content-length and ensure any
@@ -1222,8 +1228,10 @@ class S3FileSystem::Impl {
   }
 };
 
-S3FileSystem::S3FileSystem(const S3Options& options) : impl_(new Impl{options}),
-      metrics_manager_(new MetricsManager()), download_scheduler_(new DownloadScheduler()) {}
+S3FileSystem::S3FileSystem(const S3Options& options)
+    : impl_(new Impl{options}),
+      metrics_manager_(new MetricsManager()),
+      download_scheduler_(new DownloadScheduler()) {}
 
 S3FileSystem::~S3FileSystem() {}
 
@@ -1484,7 +1492,8 @@ Result<std::shared_ptr<io::InputStream>> S3FileSystem::OpenInputStream(
   RETURN_NOT_OK(S3Path::FromString(s, &path));
   RETURN_NOT_OK(ValidateFilePath(path));
 
-  auto ptr = std::make_shared<ObjectInputFile>(impl_->client_.get(), path, metrics_manager_, download_scheduler_);
+  auto ptr = std::make_shared<ObjectInputFile>(impl_->client_.get(), path,
+                                               metrics_manager_, download_scheduler_);
   RETURN_NOT_OK(ptr->Init());
   return ptr;
 }
@@ -1495,7 +1504,8 @@ Result<std::shared_ptr<io::RandomAccessFile>> S3FileSystem::OpenInputFile(
   RETURN_NOT_OK(S3Path::FromString(s, &path));
   RETURN_NOT_OK(ValidateFilePath(path));
 
-  auto ptr = std::make_shared<ObjectInputFile>(impl_->client_.get(), path, metrics_manager_, download_scheduler_);
+  auto ptr = std::make_shared<ObjectInputFile>(impl_->client_.get(), path,
+                                               metrics_manager_, download_scheduler_);
   RETURN_NOT_OK(ptr->Init());
   return ptr;
 }
@@ -1520,9 +1530,7 @@ Result<std::shared_ptr<io::OutputStream>> S3FileSystem::OpenAppendStream(
   return Status::NotImplemented("It is not possible to append efficiently to S3 objects");
 }
 
-std::shared_ptr<MetricsManager> S3FileSystem::GetMetrics() {
-  return metrics_manager_;
-}
+std::shared_ptr<MetricsManager> S3FileSystem::GetMetrics() { return metrics_manager_; }
 
 std::shared_ptr<DownloadScheduler> S3FileSystem::GetDownloadScheduler() {
   return download_scheduler_;
@@ -1531,27 +1539,30 @@ std::shared_ptr<DownloadScheduler> S3FileSystem::GetDownloadScheduler() {
 void MetricsManager::Print() const {
   // event timing stats
   std::lock_guard<std::mutex> guard(metrics_mutex_);
-  std::map<std::thread::id,std::vector<arrow::fs::MetricEvent>> thread_map;
-  for (const auto & event: events_) {
+  std::map<std::thread::id, std::vector<arrow::fs::MetricEvent>> thread_map;
+  for (const auto& event : events_) {
     thread_map[event.thread_id].push_back(event);
   }
 
-  std::multimap<int64_t,std::vector<arrow::fs::MetricEvent>> sorted_threads;
-  for (const auto& thread: thread_map) {
+  std::multimap<int64_t, std::vector<arrow::fs::MetricEvent>> sorted_threads;
+  for (const auto& thread : thread_map) {
     auto metric_events = thread.second;
-    std::sort(metric_events.begin(), metric_events.end(), [](MetricEvent const& a, MetricEvent const& b) -> bool {
-      return a.time < b.time;
-    });
-    auto first_time = std::chrono::duration_cast<std::chrono::milliseconds>(metric_events[0].time-ref_time).count();
+    std::sort(metric_events.begin(), metric_events.end(),
+              [](MetricEvent const& a, MetricEvent const& b) -> bool {
+                return a.time < b.time;
+              });
+    auto first_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+                          metric_events[0].time - ref_time)
+                          .count();
     sorted_threads.insert({first_time, metric_events});
   }
 
-  for (const auto& thread: sorted_threads) {
+  for (const auto& thread : sorted_threads) {
     std::cout << thread.second[0].thread_id;
     auto previous_time = ref_time;
-    for(const auto& event: thread.second) {
+    for (const auto& event : thread.second) {
       std::cout << ",";
-      std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(event.time-previous_time).count();
+      std::cout << ::util::get_duration_ms(previous_time, event.time);
       previous_time = event.time;
     }
     std::cout << std::endl;
@@ -1559,17 +1570,17 @@ void MetricsManager::Print() const {
 
   // size stats
   auto total_dl = 0;
-  for (auto dl: reads_) {
+  for (auto dl : reads_) {
     total_dl += dl;
   }
   std::cout << "nb_dl," << reads_.size() << ",bytes_dl," << total_dl << std::endl;
 }
 
 Status MetricsManager::NewEvent(std::string type) {
-  MetricEvent event {
-    std::chrono::high_resolution_clock::now(),
-    std::this_thread::get_id(),
-    type,
+  MetricEvent event{
+      std::chrono::high_resolution_clock::now(),
+      std::this_thread::get_id(),
+      type,
   };
   std::lock_guard<std::mutex> guard(metrics_mutex_);
   events_.push_back(event);
@@ -1582,22 +1593,14 @@ Status MetricsManager::AddRead(int64_t read_size) {
   return Status::OK();
 }
 
-int16_t GetEnvInt(const char *name, int16_t def) {
-  auto raw_var = getenv(name);
-  if (raw_var == nullptr) {
-    return def;
-  }
-  return std::stoi(raw_var);
-}
-
 DownloadScheduler::DownloadScheduler() {
-  max_concurrent_dl_ = GetEnvInt("MAX_CONCURRENT_DL", max_concurrent_dl_);
-  max_concurrent_proc_ = GetEnvInt("MAX_CONCURRENT_PROC", max_concurrent_proc_);
+  max_concurrent_dl_ = ::util::getenv_int("MAX_CONCURRENT_DL", max_concurrent_dl_);
+  max_concurrent_proc_ = ::util::getenv_int("MAX_CONCURRENT_PROC", max_concurrent_proc_);
 }
 
 Status DownloadScheduler::WaitDownloadSlot() {
   std::unique_lock<std::mutex> lk(concurrent_dl_mutex_);
-  concurrent_dl_cv_.wait(lk, [this]{ return concurrent_dl_ < max_concurrent_dl_; });
+  concurrent_dl_cv_.wait(lk, [this] { return concurrent_dl_ < max_concurrent_dl_; });
   ++concurrent_dl_;
   return Status::OK();
 }
@@ -1615,7 +1618,8 @@ Status DownloadScheduler::NotifyDownloadSlot() {
 
 Status DownloadScheduler::WaitProcessingSlot() {
   std::unique_lock<std::mutex> lk(concurrent_proc_mutex_);
-  concurrent_proc_cv_.wait(lk, [this]{ return concurrent_proc_ < max_concurrent_proc_; });
+  concurrent_proc_cv_.wait(lk,
+                           [this] { return concurrent_proc_ < max_concurrent_proc_; });
   ++concurrent_proc_;
   return Status::OK();
 }

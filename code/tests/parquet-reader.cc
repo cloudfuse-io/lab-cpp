@@ -26,11 +26,7 @@
 #include <iostream>
 
 #include "s3fs-forked.h"
-
-auto get_duration(std::chrono::_V2::system_clock::time_point start,
-                  std::chrono::_V2::system_clock::time_point end) {
-  return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-}
+#include "various.h"
 
 // helper
 std::unique_ptr<parquet::arrow::FileReader> get_column(
@@ -92,7 +88,7 @@ void read_single_column(std::unique_ptr<parquet::arrow::FileReader> reader,
   auto t1 = std::chrono::high_resolution_clock::now();
   PARQUET_THROW_NOT_OK(reader->ReadTable({col_index}, &table));
   auto t2 = std::chrono::high_resolution_clock::now();
-  std::cout << "read duration: " << get_duration(t1, t2) << std::endl;
+  std::cout << "read duration: " << util::get_duration_ms(t1, t2) << std::endl;
   std::cout << "table->num_rows:" << table->num_rows() << std::endl;
   std::cout << "table->num_columns:" << table->num_columns() << std::endl;
 
@@ -102,7 +98,7 @@ void read_single_column(std::unique_ptr<parquet::arrow::FileReader> reader,
   PARQUET_THROW_NOT_OK(
       arrow::compute::Sum(&function_context, column_datum, &result_datum));
   auto t3 = std::chrono::high_resolution_clock::now();
-  std::cout << "sum duration: " << get_duration(t2, t3) << std::endl;
+  std::cout << "sum duration: " << util::get_duration_ms(t2, t3) << std::endl;
   std::cout << "sum:" << result_datum.scalar()->ToString() << std::endl;
 
   std::cout << std::endl;

@@ -17,12 +17,12 @@
 
 #pragma once
 
+#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <string>
-#include <condition_variable>
-#include <vector>
 #include <thread>
+#include <vector>
 
 #include "arrow/filesystem/filesystem.h"
 #include "arrow/util/macros.h"
@@ -91,35 +91,36 @@ struct ARROW_EXPORT MetricEvent {
 };
 
 class ARROW_EXPORT MetricsManager {
-  public:
-    void Print() const;
-    Status NewEvent(std::string type);
-    Status AddRead(int64_t read_size);
+ public:
+  void Print() const;
+  Status NewEvent(std::string type);
+  Status AddRead(int64_t read_size);
 
-  private:
-    mutable std::mutex metrics_mutex_;
-    std::vector<MetricEvent> events_;
-    std::vector<int64_t> reads_;
-    std::chrono::_V2::system_clock::time_point ref_time = std::chrono::high_resolution_clock::now();
+ private:
+  mutable std::mutex metrics_mutex_;
+  std::vector<MetricEvent> events_;
+  std::vector<int64_t> reads_;
+  std::chrono::_V2::system_clock::time_point ref_time =
+      std::chrono::high_resolution_clock::now();
 };
 
 class ARROW_EXPORT DownloadScheduler {
-  public:
+ public:
   DownloadScheduler();
-    Status WaitDownloadSlot();
-    Status NotifyDownloadSlot();
-    Status WaitProcessingSlot();
-    Status NotifyProcessingSlot();
+  Status WaitDownloadSlot();
+  Status NotifyDownloadSlot();
+  Status WaitProcessingSlot();
+  Status NotifyProcessingSlot();
 
-  private:
-    std::mutex concurrent_dl_mutex_;
-    std::condition_variable concurrent_dl_cv_;
-    int16_t concurrent_dl_ = 0;
-    int16_t max_concurrent_dl_ = 1;
-    std::mutex concurrent_proc_mutex_;
-    std::condition_variable concurrent_proc_cv_;
-    int16_t concurrent_proc_ = 0;
-    int16_t max_concurrent_proc_ = 1;
+ private:
+  std::mutex concurrent_dl_mutex_;
+  std::condition_variable concurrent_dl_cv_;
+  int16_t concurrent_dl_ = 0;
+  int16_t max_concurrent_dl_ = 1;
+  std::mutex concurrent_proc_mutex_;
+  std::condition_variable concurrent_proc_cv_;
+  int16_t concurrent_proc_ = 0;
+  int16_t max_concurrent_proc_ = 1;
 };
 
 /// S3-backed FileSystem implementation.
@@ -178,7 +179,7 @@ class ARROW_EXPORT S3FileSystem : public FileSystem {
 
   Result<std::shared_ptr<io::OutputStream>> OpenAppendStream(
       const std::string& path) override;
-  
+
   std::shared_ptr<MetricsManager> GetMetrics();
   std::shared_ptr<DownloadScheduler> GetDownloadScheduler();
 

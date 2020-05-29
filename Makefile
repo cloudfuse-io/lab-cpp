@@ -53,7 +53,7 @@ compose-clean-run:
 	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.yaml build
 	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.yaml up --abort-on-container-exit
 	docker logs amznlinux1-run-cpp_lambda-emulator_1
-	docker cp amznlinux1-run-cpp_lambda-emulator_1:/massif.out.1 massif.out.1
+	# docker cp amznlinux1-run-cpp_lambda-emulator_1:/massif.out.1 massif.out.1
 	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.yaml rm -fsv
 
 run-local-query-bandwidth: build-query-bandwidth
@@ -77,7 +77,7 @@ run-local-mem-alloc: build-mem-alloc
 	VALGRIND_CMD="" \
 	COMPOSE_TYPE=standalone \
 	BUILD_FILE=mem-alloc \
-	MEGA_ALLOCATED=100 \
+	MEGA_ALLOCATED=10 \
 	make compose-clean-run
 
 run-local-simd-support: build-simd-support

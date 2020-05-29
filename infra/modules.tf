@@ -14,9 +14,9 @@ module "parquet-reader-static" {
 
   additional_policies = [aws_iam_policy.scanner-additional-policy.arn]
   environment = {
-    MAX_CONCURRENT_DL: 8
-    MAX_CONCURRENT_PROC: 1
-    COLUMN_NAME: "href"
+    MAX_CONCURRENT_DL : 8
+    MAX_CONCURRENT_PROC : 1
+    COLUMN_NAME : "href"
   }
 }
 
@@ -48,7 +48,8 @@ module "mem-alloc-static" {
 
   additional_policies = [aws_iam_policy.scanner-additional-policy.arn]
   environment = {
-    MEGA_ALLOCATED = 100
+    NB_ALLOCATION : 100
+    ALLOCATION_SIZE_BYTE : 1048576
   }
 }
 

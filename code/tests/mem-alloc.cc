@@ -13,68 +13,49 @@
 
 #include "various.h"
 
-static size_t max_pages_est = util::getenv_int("MEGA_ALLOCATED", 1000) * 1024 / 4 * 10;
+constexpr int64_t PAGE_SIZE = 4 * 1024;
+constexpr int64_t NB_REPETITION = 2;
+
+static int64_t nb_allocations = util::getenv_int("NB_ALLOCATION", 100);
+static int64_t allocation_size_byte =
+    util::getenv_int("ALLOCATION_SIZE_BYTE", 1024 * 1024);
+
+// the max nb of pages that we expect to allocate
+static size_t max_pages_est =
+    nb_allocations * allocation_size_byte / PAGE_SIZE * NB_REPETITION;
 static std::unordered_set<uint32_t> allocated_pages(max_pages_est);
 
 static aws::lambda_runtime::invocation_response my_handler(
     aws::lambda_runtime::invocation_request const& req) {
   std::cout << "backend_name:" << arrow::default_memory_pool()->backend_name()
             << std::endl;
-  std::cout << "GROWING IN TWO PHASES 1MB" << std::endl;
-  std::cout << "iteration,allocation_duration,new_pages_allocated,pool_max_memory"
-            << std::endl;
-  for (int i = 1; i <= 10; i++) {
-    uint64_t allocation_duration{0};
-    uint32_t new_pages_allocated{0};
-    uint32_t nb_true{0};
-    {
-      std::vector<std::shared_ptr<arrow::Buffer>> buffers;
-      for (int j = 0; j < util::getenv_int("MEGA_ALLOCATED", 1000); j++) {
-        std::shared_ptr<arrow::Buffer> buf;
-        auto start_time = std::chrono::high_resolution_clock::now();
-        PARQUET_ASSIGN_OR_THROW(
-            buf, arrow::AllocateBuffer(1024 * 1024, arrow::default_memory_pool()));
-        memset(buf->mutable_data(), i, static_cast<size_t>(buf->size()));
-        auto end_time = std::chrono::high_resolution_clock::now();
-        allocation_duration += util::get_duration_ms(start_time, end_time);
-        auto current_ptr_page = buf->mutable_address() / 4 / 1024;
-        for (int i = 0; i < 1024 / 4; i++) {
-          new_pages_allocated += allocated_pages.insert(current_ptr_page + i).second;
-        }
-        buffers.push_back(buf);
-      }
-    }
+  std::cout << "ALLOCATING " << nb_allocations << " CHUNCKS OF " << allocation_size_byte
+            << " BYTES" << std::endl;
+  std::cout << "iteration;allocation_duration;new_pages_allocated" << std::endl;
 
-    std::cout << i << ",";
-    std::cout << allocation_duration << ",";
-    std::cout << new_pages_allocated << ",";
-    std::cout << arrow::default_memory_pool()->max_memory() << std::endl;
-  }
-
-  for (int i = 1; i <= 10; i++) {
-    uint64_t allocation_duration{0};
-    uint32_t new_pages_allocated{0};
-    {
-      std::vector<std::shared_ptr<arrow::Buffer>> buffers;
-      for (int j = 0; j < util::getenv_int("MEGA_ALLOCATED", 1000) * 2; j++) {
-        std::shared_ptr<arrow::Buffer> buf;
-        auto start_time = std::chrono::high_resolution_clock::now();
-        PARQUET_ASSIGN_OR_THROW(
-            buf, arrow::AllocateBuffer(1024 * 1024, arrow::default_memory_pool()));
-        memset(buf->mutable_data(), i, static_cast<size_t>(buf->size()));
-        auto end_time = std::chrono::high_resolution_clock::now();
-        allocation_duration += util::get_duration_ms(start_time, end_time);
-        auto current_ptr_page = buf->mutable_address() / 4 / 1024;
-        for (int i = 0; i < 1024 / 4; i++) {
-          new_pages_allocated += allocated_pages.insert(current_ptr_page + i).second;
+  for (int i = 1; i <= NB_REPETITION; i++) {
+    std::vector<std::shared_ptr<arrow::Buffer>> buffers;
+    for (int j = 0; j < nb_allocations; j++) {
+      uint32_t new_pages_allocated{0};
+      std::shared_ptr<arrow::Buffer> buf;
+      auto start_time = std::chrono::high_resolution_clock::now();
+      int64_t size_to_allocate = allocation_size_byte;
+      PARQUET_ASSIGN_OR_THROW(
+          buf, arrow::AllocateBuffer(size_to_allocate, arrow::default_memory_pool()));
+      memset(buf->mutable_data(), i, static_cast<size_t>(buf->size()));
+      auto end_time = std::chrono::high_resolution_clock::now();
+      auto current_ptr_page = buf->mutable_address() / PAGE_SIZE;
+      for (int i = 0; i < size_to_allocate / PAGE_SIZE; i++) {
+        if (allocated_pages.insert(current_ptr_page + i).second) {
+          new_pages_allocated++;
         }
-        buffers.push_back(buf);
       }
+      buffers.push_back(buf);
+
+      std::cout << i << ";";
+      std::cout << util::get_duration_micro(start_time, end_time) << ";";
+      std::cout << new_pages_allocated << std::endl;
     }
-    std::cout << i << ",";
-    std::cout << allocation_duration << ",";
-    std::cout << new_pages_allocated << ",";
-    std::cout << arrow::default_memory_pool()->max_memory() << std::endl;
   }
   return aws::lambda_runtime::invocation_response::success("Yessss!", "text/plain");
 }

@@ -28,6 +28,11 @@ inline int64_t get_duration_ms(std::chrono::_V2::system_clock::time_point start,
   return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 }
 
+inline int64_t get_duration_micro(std::chrono::_V2::system_clock::time_point start,
+                                  std::chrono::_V2::system_clock::time_point end) {
+  return std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+}
+
 inline int64_t getenv_int(const char* name, int64_t def) {
   auto raw_var = getenv(name);
   if (raw_var == nullptr) {

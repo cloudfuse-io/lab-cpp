@@ -77,7 +77,8 @@ run-local-mem-alloc: build-mem-alloc
 	VALGRIND_CMD="" \
 	COMPOSE_TYPE=standalone \
 	BUILD_FILE=mem-alloc \
-	MEGA_ALLOCATED=10 \
+	NB_ALLOCATION=10 \
+	ALLOCATION_SIZE_BYTE=1048576 \
 	make compose-clean-run
 
 run-local-simd-support: build-simd-support

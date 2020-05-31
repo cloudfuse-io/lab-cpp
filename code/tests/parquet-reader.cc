@@ -119,8 +119,9 @@ void read_single_column_parallel(std::unique_ptr<parquet::arrow::FileReader> rea
     auto fut = std::async(std::launch::async, [col_index, i, shared_reader, fs]() {
       fs->GetMetrics()->NewEvent("read_start");
       std::shared_ptr<arrow::ChunkedArray> array;
+      fs->GetDownloadScheduler()->RegisterThreadForSync();
       PARQUET_THROW_NOT_OK(shared_reader->RowGroup(i)->Column(col_index)->Read(&array));
-      fs->GetDownloadScheduler()->NotifyProcessingSlot();
+      fs->GetDownloadScheduler()->NotifyProcessingDone();
       fs->GetMetrics()->NewEvent("read_end");
       return std::move(array);
     });
@@ -184,9 +185,8 @@ static aws::lambda_runtime::invocation_response my_handler(
     auto properties = parquet::ArrowReaderProperties();
     properties.set_read_dictionary(4, true);
     PARQUET_THROW_NOT_OK(builder.Open(infile));
+    // here the footer gets downloaded
     PARQUET_THROW_NOT_OK(builder.properties(properties)->Build(&reader));
-    fs->GetDownloadScheduler()
-        ->NotifyProcessingSlot();  // here the footer gets downloaded
 
     // std::cout << "reader->num_row_groups:" << reader->num_row_groups() << std::endl;
     // std::cout << "reader->num_rows:" <<

@@ -17,7 +17,6 @@
 
 #pragma once
 
-#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -27,6 +26,7 @@
 #include "arrow/filesystem/filesystem.h"
 #include "arrow/util/macros.h"
 #include "arrow/util/uri.h"
+#include "scheduler.h"
 
 namespace Aws {
 namespace Auth {
@@ -102,25 +102,6 @@ class ARROW_EXPORT MetricsManager {
   std::vector<int64_t> reads_;
   std::chrono::_V2::system_clock::time_point ref_time =
       std::chrono::high_resolution_clock::now();
-};
-
-class ARROW_EXPORT DownloadScheduler {
- public:
-  DownloadScheduler();
-  Status WaitDownloadSlot();
-  Status NotifyDownloadSlot();
-  Status WaitProcessingSlot();
-  Status NotifyProcessingSlot();
-
- private:
-  std::mutex concurrent_dl_mutex_;
-  std::condition_variable concurrent_dl_cv_;
-  int16_t concurrent_dl_ = 0;
-  int16_t max_concurrent_dl_ = 1;
-  std::mutex concurrent_proc_mutex_;
-  std::condition_variable concurrent_proc_cv_;
-  int16_t concurrent_proc_ = 0;
-  int16_t max_concurrent_proc_ = 1;
 };
 
 /// S3-backed FileSystem implementation.

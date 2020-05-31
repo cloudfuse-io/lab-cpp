@@ -20,9 +20,9 @@
 #include <algorithm>
 #include <atomic>
 #include <sstream>
-#include <unordered_map>
 #include <utility>
 
+#include "scheduler.h"
 #include "various.h"
 
 #ifdef _WIN32
@@ -481,14 +481,21 @@ class ObjectInputFile : public io::RandomAccessFile {
       return 0;
     }
 
+    ARROW_ASSIGN_OR_RAISE(bool is_synchronized,
+                          download_scheduler_->IsThreadRegisteredForSync());
+
     // Read the desired range of bytes
     metrics_manager_->AddRead(nbytes);
-    download_scheduler_->WaitDownloadSlot();
+    if (is_synchronized) {
+      download_scheduler_->WaitDownloadSlot();
+    }
     metrics_manager_->NewEvent("get_obj_start");
     RETURN_NOT_OK(GetObjectRange(client_, path_, position, nbytes, out));
     metrics_manager_->NewEvent("get_obj_end");
-    download_scheduler_->NotifyDownloadSlot();
-    download_scheduler_->WaitProcessingSlot();
+    if (is_synchronized) {
+      download_scheduler_->NotifyDownloadDone();
+      download_scheduler_->WaitProcessingSlot();
+    }
     metrics_manager_->NewEvent("start_processing");
 
     return nbytes;
@@ -1590,48 +1597,6 @@ Status MetricsManager::NewEvent(std::string type) {
 Status MetricsManager::AddRead(int64_t read_size) {
   std::lock_guard<std::mutex> guard(metrics_mutex_);
   reads_.push_back(read_size);
-  return Status::OK();
-}
-
-DownloadScheduler::DownloadScheduler() {
-  max_concurrent_dl_ = ::util::getenv_int("MAX_CONCURRENT_DL", max_concurrent_dl_);
-  max_concurrent_proc_ = ::util::getenv_int("MAX_CONCURRENT_PROC", max_concurrent_proc_);
-}
-
-Status DownloadScheduler::WaitDownloadSlot() {
-  std::unique_lock<std::mutex> lk(concurrent_dl_mutex_);
-  concurrent_dl_cv_.wait(lk, [this] { return concurrent_dl_ < max_concurrent_dl_; });
-  ++concurrent_dl_;
-  return Status::OK();
-}
-
-Status DownloadScheduler::NotifyDownloadSlot() {
-  {
-    std::unique_lock<std::mutex> lk(concurrent_dl_mutex_);
-    if (concurrent_dl_ > 0) {
-      --concurrent_dl_;
-    }
-  }
-  concurrent_dl_cv_.notify_one();
-  return Status::OK();
-}
-
-Status DownloadScheduler::WaitProcessingSlot() {
-  std::unique_lock<std::mutex> lk(concurrent_proc_mutex_);
-  concurrent_proc_cv_.wait(lk,
-                           [this] { return concurrent_proc_ < max_concurrent_proc_; });
-  ++concurrent_proc_;
-  return Status::OK();
-}
-
-Status DownloadScheduler::NotifyProcessingSlot() {
-  {
-    std::unique_lock<std::mutex> lk(concurrent_proc_mutex_);
-    if (concurrent_proc_ > 0) {
-      --concurrent_proc_;
-    }
-  }
-  concurrent_proc_cv_.notify_one();
   return Status::OK();
 }
 

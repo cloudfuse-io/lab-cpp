@@ -9,6 +9,7 @@ if [ "$1" = 'build' ]; then
     cmake .. -DCMAKE_BUILD_TYPE=Release \
       -DARROW_CXXFLAGS="-ldl -g" \
       -DARROW_BUILD_SHARED=OFF \
+      -DARROW_JEMALLOC=ON \
       -DARROW_PARQUET=ON \
       -DARROW_S3=ON \
       -DARROW_FILESYSTEM=ON \

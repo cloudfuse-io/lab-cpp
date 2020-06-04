@@ -35,17 +35,8 @@ arrow-cpp-bench-image: bin-folder
 	docker build -t buzz-arrow-cpp-bench -f docker/arrow-cpp/benchmarks.Dockerfile .
 	docker run --rm -it -v ${CURDIR}/bin/build-bench:/tmp/ buzz-arrow-cpp-bench
 
-build-query-bandwidth: arrow-cpp-build-image
-	docker run --rm -v ${CURDIR}/bin/build-amznlinux1:/source/cpp/build -e BUILD_FILE=query-bandwidth -e BUILD_TYPE=static buzz-arrow-cpp-build
-
-build-parquet-reader: arrow-cpp-build-image
-	docker run --rm -v ${CURDIR}/bin/build-amznlinux1:/source/cpp/build -e BUILD_FILE=parquet-reader -e BUILD_TYPE=static buzz-arrow-cpp-build
-
-build-mem-alloc: arrow-cpp-build-image
-	docker run --rm -v ${CURDIR}/bin/build-amznlinux1:/source/cpp/build -e BUILD_FILE=mem-alloc -e BUILD_TYPE=static buzz-arrow-cpp-build
-
-build-simd-support: arrow-cpp-build-image
-	docker run --rm -v ${CURDIR}/bin/build-amznlinux1:/source/cpp/build -e BUILD_FILE=simd-support -e BUILD_TYPE=static buzz-arrow-cpp-build
+build: arrow-cpp-build-image
+	docker run --rm -v ${CURDIR}/bin/build-amznlinux1:/source/cpp/build -e BUILD_FILE=${BUILD_FILE} -e BUILD_TYPE=static buzz-arrow-cpp-build
 
 ## deployment commands
 
@@ -56,39 +47,62 @@ compose-clean-run:
 	# docker cp amznlinux1-run-cpp_lambda-emulator_1:/massif.out.1 massif.out.1
 	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.yaml rm -fsv
 
-run-local-query-bandwidth: build-query-bandwidth
+# VALGRIND_CMD="valgrind --leak-check=yes"
+# VALGRIND_CMD="valgrind --pages-as-heap=yes --tool=massif"
+
+run-local-query-bandwidth: 
+	BUILD_FILE=query-bandwidth make build
 	VALGRIND_CMD="" \
 	COMPOSE_TYPE=minio \
 	BUILD_FILE=query-bandwidth \
 	make compose-clean-run
 
-run-local-parquet-reader: build-parquet-reader
+run-local-parquet-reader:
+	BUILD_FILE=parquet-reader make build
 	VALGRIND_CMD="" \
 	COMPOSE_TYPE=minio \
 	BUILD_FILE=parquet-reader \
 	MAX_CONCURRENT_DL=8 \
 	MAX_CONCURRENT_PROC=1 \
-	COLUMN_NAME=device \
+	COLUMN_NAME=href \
 	make compose-clean-run
 
-run-local-mem-alloc: build-mem-alloc
-	# VALGRIND_CMD="valgrind --leak-check=yes"
-	# VALGRIND_CMD="valgrind --pages-as-heap=yes --tool=massif"
+run-local-mem-alloc-overprov:
+	BUILD_FILE=mem-alloc-overprov make build
 	VALGRIND_CMD="" \
 	COMPOSE_TYPE=standalone \
-	BUILD_FILE=mem-alloc \
-	NB_ALLOCATION=10 \
-	ALLOCATION_SIZE_BYTE=1048576 \
+	BUILD_FILE=mem-alloc-overprov \
 	make compose-clean-run
 
-run-local-simd-support: build-simd-support
+run-local-mem-alloc-speed:
+	BUILD_FILE=mem-alloc-speed make build
+	VALGRIND_CMD="" \
+	COMPOSE_TYPE=standalone \
+	BUILD_FILE=mem-alloc-speed \
+	make compose-clean-run
+
+run-local-simd-support:
+	BUILD_FILE=simd-support make build
 	VALGRIND_CMD="" \
 	COMPOSE_TYPE=standalone \
 	BUILD_FILE=simd-support \
 	make compose-clean-run
 
+run-local-raw-alloc:
+	BUILD_FILE=raw-alloc make build
+	VALGRIND_CMD="" \
+	COMPOSE_TYPE=standalone \
+	BUILD_FILE=raw-alloc \
+	make compose-clean-run
+
 # temp command:
-force-deploy-dev: build-query-bandwidth build-parquet-reader build-mem-alloc build-simd-support
+force-deploy-dev:
+	BUILD_FILE=query-bandwidth make build
+	BUILD_FILE=parquet-reader make build
+	BUILD_FILE=mem-alloc-overprov make build
+	BUILD_FILE=mem-alloc-speed make build
+	BUILD_FILE=simd-support make build
+	BUILD_FILE=raw-alloc make build
 	@echo "DEPLOYING ${GIT_REVISION} to dev ..."
 	@cd infra; terraform workspace select dev
 	@cd infra; terraform apply --var profile=bbdev --var git_revision=${GIT_REVISION}

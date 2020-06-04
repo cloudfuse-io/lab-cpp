@@ -36,11 +36,29 @@ module "query-bandwidth-static" {
   }
 }
 
-module "mem-alloc-static" {
+module "mem-alloc-overprov-static" {
   source = "./lambda"
 
-  function_name = "mem-alloc-static"
-  filename      = "../bin/build-amznlinux1/buzz/buzz-mem-alloc-static.zip"
+  function_name = "mem-alloc-overprov-static"
+  filename      = "../bin/build-amznlinux1/buzz/buzz-mem-alloc-overprov-static.zip"
+  handler       = "N/A"
+  memory_size   = 2048
+  timeout       = 10
+  runtime       = "provided"
+
+  additional_policies = [aws_iam_policy.scanner-additional-policy.arn]
+  environment = {
+    NB_ALLOCATION : 100
+    ALLOCATION_SIZE_BYTE : 1048576
+    NB_REPETITION : 100
+  }
+}
+
+module "mem-alloc-speed-static" {
+  source = "./lambda"
+
+  function_name = "mem-alloc-speed-static"
+  filename      = "../bin/build-amznlinux1/buzz/buzz-mem-alloc-speed-static.zip"
   handler       = "N/A"
   memory_size   = 2048
   timeout       = 10
@@ -65,6 +83,23 @@ module "simd-support-static" {
 
   additional_policies = [aws_iam_policy.scanner-additional-policy.arn]
   environment = {
-    MOCK = "mock"
+    MOCK = 0
+  }
+}
+
+module "raw-alloc-static" {
+  source = "./lambda"
+
+  function_name = "raw-alloc-static"
+  filename      = "../bin/build-amznlinux1/buzz/buzz-raw-alloc-static.zip"
+  handler       = "N/A"
+  memory_size   = 2048
+  timeout       = 10
+  runtime       = "provided"
+
+  additional_policies = [aws_iam_policy.scanner-additional-policy.arn]
+  environment = {
+    NB_PAGE         = 1024
+    ALLOC_TEST_NAME = "mmap_madv_newplace"
   }
 }

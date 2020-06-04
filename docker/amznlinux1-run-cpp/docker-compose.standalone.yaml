@@ -11,9 +11,7 @@ services:
     volumes:
       - ~/.aws:/root/.aws
     cpus: 1
-    # mem_limit: 2048M
+    mem_limit: 2048M
     environment:
-      NB_ALLOCATION: ${NB_ALLOCATION}
-      ALLOCATION_SIZE_BYTE: ${ALLOCATION_SIZE_BYTE}
       VALGRIND_CMD: ${VALGRIND_CMD}
 

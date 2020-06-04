@@ -28,6 +28,8 @@
 #include "s3fs-forked.h"
 #include "various.h"
 
+extern char* je_arrow_malloc_conf;
+
 // helper
 std::unique_ptr<parquet::arrow::FileReader> get_column(
     std::unique_ptr<parquet::arrow::FileReader> reader, std::string col_name,
@@ -105,9 +107,9 @@ void read_single_column(std::unique_ptr<parquet::arrow::FileReader> reader,
 }
 
 // #3: Read an entire column chunck by chunck
-void read_single_column_parallel(std::unique_ptr<parquet::arrow::FileReader> reader,
-                                 std::shared_ptr<arrow::fs::S3FileSystem> fs,
-                                 std::string col_name) {
+std::shared_ptr<arrow::Table> read_single_column_parallel(
+    std::unique_ptr<parquet::arrow::FileReader> reader,
+    std::shared_ptr<arrow::fs::S3FileSystem> fs, std::string col_name) {
   int col_index;
   reader = get_column(std::move(reader), col_name, col_index);
 
@@ -150,10 +152,12 @@ void read_single_column_parallel(std::unique_ptr<parquet::arrow::FileReader> rea
   // PARQUET_THROW_NOT_OK(arrow::compute::Sum(&function_context, column_datum,
   // &result_datum)); std::cout << "sum:" << result_datum.scalar()->ToString() <<
   // std::endl;
+  return table;
 }
 
 static aws::lambda_runtime::invocation_response my_handler(
     aws::lambda_runtime::invocation_request const& req) {
+  std::cout << "je_arrow_malloc_conf:" << je_arrow_malloc_conf << std::endl;
   //// setup s3fs ////
   arrow::fs::S3Options options = arrow::fs::S3Options::Defaults();
   options.region = "eu-west-1";
@@ -199,11 +203,13 @@ static aws::lambda_runtime::invocation_response my_handler(
     // read_whole_file(std::move(reader));
     // read_single_column_chunk(std::move(reader), "cpm");
     // read_single_column(std::move(reader), "cpm");
-    read_single_column_parallel(std::move(reader), fs, getenv("COLUMN_NAME"));
+    auto table =
+        read_single_column_parallel(std::move(reader), fs, getenv("COLUMN_NAME"));
+    std::cout << "arrow::default_memory_pool()->bytes_allocated():"
+              << arrow::default_memory_pool()->bytes_allocated() << std::endl;
+    std::cout << "arrow::default_memory_pool()->max_memory():"
+              << arrow::default_memory_pool()->max_memory() << std::endl;
   }
-
-  std::cout << "arrow::default_memory_pool()->max_memory():"
-            << arrow::default_memory_pool()->max_memory() << std::endl;
 
   fs->GetMetrics()->Print();
 

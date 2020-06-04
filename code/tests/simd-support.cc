@@ -1,8 +1,12 @@
 #include <aws/lambda-runtime/runtime.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <fstream>
 #include <iostream>
+#include <thread>
+
+#include "various.h"
 #ifdef _MSC_VER
 #include <intrin.h>
 #endif
@@ -26,8 +30,7 @@ unsigned long long _xgetbv(unsigned int index) {
 
 #endif
 
-static aws::lambda_runtime::invocation_response my_handler(
-    aws::lambda_runtime::invocation_request const& req) {
+void print_simd_support() {
   bool sseSupportted = false;
   bool sse2Supportted = false;
   bool sse3Supportted = false;
@@ -79,7 +82,6 @@ static aws::lambda_runtime::invocation_response my_handler(
   }
 
   // ----------------------------------------------------------------------
-  std::cout << "==> SUPPORTED SIMD INSTRUCTION SETS" << std::endl;
   std::cout << "SSE:" << (sseSupportted ? 1 : 0) << std::endl;
   std::cout << "SSE2:" << (sse2Supportted ? 1 : 0) << std::endl;
   std::cout << "SSE3:" << (sse3Supportted ? 1 : 0) << std::endl;
@@ -88,12 +90,16 @@ static aws::lambda_runtime::invocation_response my_handler(
   std::cout << "SSE4a:" << (sse4aSupportted ? 1 : 0) << std::endl;
   std::cout << "SSE5:" << (sse5Supportted ? 1 : 0) << std::endl;
   std::cout << "AVX:" << (avxSupportted ? 1 : 0) << std::endl;
+}
 
-  std::cout << "==> ADDRESS SPACE" << std::endl;
-  std::ifstream maps("/proc/self/maps");
-  char buffer[1024];
-  maps.rdbuf()->sgetn(buffer, 1024);
-  std::cout << buffer << std::endl;
+static aws::lambda_runtime::invocation_response my_handler(
+    aws::lambda_runtime::invocation_request const& req) {
+  std::cout << "==> SUPPORTED SIMD INSTRUCTION SETS" << std::endl;
+  print_simd_support();
+
+  std::cout << "==> HARDWARE CONCURRENCY" << std::endl;
+  std::cout << "std::thread::hardware_concurrency()="
+            << std::thread::hardware_concurrency() << std::endl;
 
   return aws::lambda_runtime::invocation_response::success("Yessss!", "text/plain");
 }

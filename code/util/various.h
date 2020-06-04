@@ -34,10 +34,18 @@ inline int64_t get_duration_micro(std::chrono::_V2::system_clock::time_point sta
 }
 
 inline int64_t getenv_int(const char* name, int64_t def) {
-  auto raw_var = getenv(name);
+  auto raw_var = ::getenv(name);
   if (raw_var == nullptr) {
     return def;
   }
   return std::stoi(raw_var);
+}
+
+inline const char* getenv(const char* name, const char* def) {
+  auto raw_var = ::getenv(name);
+  if (raw_var == nullptr) {
+    return def;
+  }
+  return raw_var;
 }
 }  // namespace util

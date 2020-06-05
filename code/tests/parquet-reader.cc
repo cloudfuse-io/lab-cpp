@@ -25,10 +25,16 @@
 #include <future>
 #include <iostream>
 
+#include "cust_memory_pool.h"
 #include "s3fs-forked.h"
+#include "scheduler.h"
 #include "various.h"
 
 extern char* je_arrow_malloc_conf;
+
+static int64_t MAX_CONCURRENT_DL = util::getenv_int("MAX_CONCURRENT_DL", 8);
+static int64_t MAX_CONCURRENT_PROC = util::getenv_int("MAX_CONCURRENT_PROC", 1);
+static std::string COLUMN_NAME = util::getenv("COLUMN_NAME", "href");
 
 // helper
 std::unique_ptr<parquet::arrow::FileReader> get_column(
@@ -109,7 +115,7 @@ void read_single_column(std::unique_ptr<parquet::arrow::FileReader> reader,
 // #3: Read an entire column chunck by chunck
 std::shared_ptr<arrow::Table> read_single_column_parallel(
     std::unique_ptr<parquet::arrow::FileReader> reader,
-    std::shared_ptr<arrow::fs::S3FileSystem> fs, std::string col_name) {
+    std::shared_ptr<arrow::fs::fork::S3FileSystem> fs, std::string col_name) {
   int col_index;
   reader = get_column(std::move(reader), col_name, col_index);
 
@@ -121,9 +127,9 @@ std::shared_ptr<arrow::Table> read_single_column_parallel(
     auto fut = std::async(std::launch::async, [col_index, i, shared_reader, fs]() {
       fs->GetMetrics()->NewEvent("read_start");
       std::shared_ptr<arrow::ChunkedArray> array;
-      fs->GetDownloadScheduler()->RegisterThreadForSync();
+      fs->GetResourceScheduler()->RegisterThreadForSync();
       PARQUET_THROW_NOT_OK(shared_reader->RowGroup(i)->Column(col_index)->Read(&array));
-      fs->GetDownloadScheduler()->NotifyProcessingDone();
+      fs->GetResourceScheduler()->NotifyProcessingDone();
       fs->GetMetrics()->NewEvent("read_end");
       return std::move(array);
     });
@@ -159,7 +165,7 @@ static aws::lambda_runtime::invocation_response my_handler(
     aws::lambda_runtime::invocation_request const& req) {
   std::cout << "je_arrow_malloc_conf:" << je_arrow_malloc_conf << std::endl;
   //// setup s3fs ////
-  arrow::fs::S3Options options = arrow::fs::S3Options::Defaults();
+  arrow::fs::fork::S3Options options = arrow::fs::fork::S3Options::Defaults();
   options.region = "eu-west-1";
   char* is_local = getenv("IS_LOCAL");
   if (is_local != NULL && strcmp(is_local, "true") == 0) {
@@ -167,8 +173,10 @@ static aws::lambda_runtime::invocation_response my_handler(
     std::cout << "endpoint_override=" << options.endpoint_override << std::endl;
     options.scheme = "http";
   }
-  std::shared_ptr<arrow::fs::S3FileSystem> fs;
-  PARQUET_ASSIGN_OR_THROW(fs, arrow::fs::S3FileSystem::Make(options));
+  std::shared_ptr<arrow::fs::fork::S3FileSystem> fs;
+  PARQUET_ASSIGN_OR_THROW(fs, arrow::fs::fork::S3FileSystem::Make(
+                                  options, new arrow::fs::fork::ResourceScheduler(
+                                               MAX_CONCURRENT_DL, MAX_CONCURRENT_PROC)));
 
   std::vector<std::string> file_names{
       "bb-test-data-dev/bid-large.parquet",
@@ -187,10 +195,12 @@ static aws::lambda_runtime::invocation_response my_handler(
     std::unique_ptr<parquet::arrow::FileReader> reader;
     parquet::arrow::FileReaderBuilder builder;
     auto properties = parquet::ArrowReaderProperties();
-    properties.set_read_dictionary(4, true);
+    // properties.set_read_dictionary(16, true);
     PARQUET_THROW_NOT_OK(builder.Open(infile));
     // here the footer gets downloaded
-    PARQUET_THROW_NOT_OK(builder.properties(properties)->Build(&reader));
+    builder.memory_pool(new arrow::CustomMemoryPool(arrow::default_memory_pool()));
+    builder.properties(properties);
+    PARQUET_THROW_NOT_OK(builder.Build(&reader));
 
     // std::cout << "reader->num_row_groups:" << reader->num_row_groups() << std::endl;
     // std::cout << "reader->num_rows:" <<
@@ -203,8 +213,7 @@ static aws::lambda_runtime::invocation_response my_handler(
     // read_whole_file(std::move(reader));
     // read_single_column_chunk(std::move(reader), "cpm");
     // read_single_column(std::move(reader), "cpm");
-    auto table =
-        read_single_column_parallel(std::move(reader), fs, getenv("COLUMN_NAME"));
+    auto table = read_single_column_parallel(std::move(reader), fs, COLUMN_NAME);
     std::cout << "arrow::default_memory_pool()->bytes_allocated():"
               << arrow::default_memory_pool()->bytes_allocated() << std::endl;
     std::cout << "arrow::default_memory_pool()->max_memory():"
@@ -218,8 +227,8 @@ static aws::lambda_runtime::invocation_response my_handler(
 
 /** LAMBDA MAIN **/
 int main() {
-  arrow::fs::S3GlobalOptions options;
-  options.log_level = arrow::fs::S3LogLevel::Warn;
+  arrow::fs::fork::S3GlobalOptions options;
+  options.log_level = arrow::fs::fork::S3LogLevel::Warn;
   PARQUET_THROW_NOT_OK(InitializeS3(options));
   char* is_local = getenv("IS_LOCAL");
   if (is_local != NULL && strcmp(is_local, "true") == 0) {

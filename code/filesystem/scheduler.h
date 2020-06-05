@@ -9,12 +9,13 @@
 
 namespace arrow {
 namespace fs {
+namespace fork {
 
-class ARROW_EXPORT DownloadScheduler {
+class ARROW_EXPORT ResourceScheduler {
  public:
   // A scheduler that manages queus for download and processing.
   // TODO: handle dequeue and unsubscription on error.
-  DownloadScheduler();
+  ResourceScheduler(int16_t max_concurrent_dl, int16_t max_concurrent_proc);
   // Register this thread as using the download on processing queues of this scheduler. It
   // will be registered until colling NotifyProcessingDone.
   Status RegisterThreadForSync();
@@ -43,5 +44,6 @@ class ARROW_EXPORT DownloadScheduler {
   int16_t max_concurrent_proc_ = 1;
 };
 
+}  // namespace fork
 }  // namespace fs
 }  // namespace arrow

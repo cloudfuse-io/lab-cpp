@@ -36,7 +36,20 @@ arrow-cpp-bench-image: bin-folder
 	docker run --rm -it -v ${CURDIR}/bin/build-bench:/tmp/ buzz-arrow-cpp-bench
 
 build: arrow-cpp-build-image
-	docker run --rm -v ${CURDIR}/bin/build-amznlinux1:/source/cpp/build -e BUILD_FILE=${BUILD_FILE} -e BUILD_TYPE=static buzz-arrow-cpp-build
+	docker run --rm \
+		-v ${CURDIR}/bin/build-amznlinux1:/source/cpp/build \
+		-e BUILD_FILE=${BUILD_FILE} \
+		-e BUILD_TYPE=static \
+		buzz-arrow-cpp-build \
+		build package
+
+test: arrow-cpp-build-image
+	docker run --rm \
+		-v ${CURDIR}/bin/build-amznlinux1:/source/cpp/build \
+		-e BUILD_FILE=${BUILD_FILE} \
+		-e BUILD_TYPE=static \
+		buzz-arrow-cpp-build \
+		build test
 
 ## deployment commands
 
@@ -62,9 +75,6 @@ run-local-parquet-reader:
 	VALGRIND_CMD="" \
 	COMPOSE_TYPE=minio \
 	BUILD_FILE=parquet-reader \
-	MAX_CONCURRENT_DL=8 \
-	MAX_CONCURRENT_PROC=1 \
-	COLUMN_NAME=href \
 	make compose-clean-run
 
 run-local-mem-alloc-overprov:

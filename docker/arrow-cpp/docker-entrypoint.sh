@@ -9,6 +9,7 @@ if [ "$1" = 'build' ]; then
     cmake .. -DCMAKE_BUILD_TYPE=Release \
       -DARROW_CXXFLAGS="-ldl -g" \
       -DARROW_BUILD_SHARED=OFF \
+      -DARROW_BUILD_TESTS=ON \
       -DARROW_JEMALLOC=ON \
       -DARROW_PARQUET=ON \
       -DARROW_S3=ON \
@@ -18,7 +19,13 @@ if [ "$1" = 'build' ]; then
       -DBUZZ_BUILD_FILE=${BUILD_FILE} \
       -DBUZZ_BUILD_TYPE=${BUILD_TYPE}
     make
-    make aws-lambda-package-buzz-${BUILD_FILE}-${BUILD_TYPE}
 else
     exec "$@"
+fi
+
+if [ "$2" = 'package' ]; then
+ make aws-lambda-package-buzz-${BUILD_FILE}-${BUILD_TYPE}
+elif [ "$2" = 'test' ]; then
+ cd /source/cpp/build/buzz
+ /opt/cmake-3.17.1-Linux-x86_64/bin/ctest --verbose
 fi

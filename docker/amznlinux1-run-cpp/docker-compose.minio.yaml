@@ -51,9 +51,6 @@ services:
     environment:
       AWS_ACCESS_KEY_ID: minio
       AWS_SECRET_ACCESS_KEY: minio123
-      MAX_CONCURRENT_DL: ${MAX_CONCURRENT_DL}
-      MAX_CONCURRENT_PROC: ${MAX_CONCURRENT_PROC}
-      COLUMN_NAME: ${COLUMN_NAME}
       VALGRIND_CMD: ${VALGRIND_CMD}
     depends_on:
       proxy:

@@ -38,6 +38,7 @@ class AWSCredentialsProvider;
 
 namespace arrow {
 namespace fs {
+namespace fork {
 
 extern ARROW_EXPORT const char* kS3DefaultRegion;
 
@@ -162,18 +163,19 @@ class ARROW_EXPORT S3FileSystem : public FileSystem {
       const std::string& path) override;
 
   std::shared_ptr<MetricsManager> GetMetrics();
-  std::shared_ptr<DownloadScheduler> GetDownloadScheduler();
+  std::shared_ptr<ResourceScheduler> GetResourceScheduler();
 
   /// Create a S3FileSystem instance from the given options.
-  static Result<std::shared_ptr<S3FileSystem>> Make(const S3Options& options);
+  static Result<std::shared_ptr<S3FileSystem>> Make(const S3Options& options,
+                                                    ResourceScheduler* scheduler);
 
  protected:
-  explicit S3FileSystem(const S3Options& options);
+  explicit S3FileSystem(const S3Options& options, ResourceScheduler* scheduler);
 
   class Impl;
   std::unique_ptr<Impl> impl_;
   std::shared_ptr<MetricsManager> metrics_manager_;
-  std::shared_ptr<DownloadScheduler> download_scheduler_;
+  std::shared_ptr<ResourceScheduler> download_scheduler_;
 };
 
 enum class S3LogLevel : int8_t { Off, Fatal, Error, Warn, Info, Debug, Trace };
@@ -196,5 +198,6 @@ Status EnsureS3Initialized();
 ARROW_EXPORT
 Status FinalizeS3();
 
+}  // namespace fork
 }  // namespace fs
 }  // namespace arrow

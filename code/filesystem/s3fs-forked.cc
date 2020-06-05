@@ -79,6 +79,8 @@ using internal::Uri;
 
 namespace fs {
 
+namespace fork {
+
 using ::Aws::Client::AWSError;
 using ::Aws::S3::S3Errors;
 namespace S3Model = Aws::S3::Model;
@@ -399,7 +401,7 @@ class ObjectInputFile : public io::RandomAccessFile {
  public:
   ObjectInputFile(Aws::S3::S3Client* client, const S3Path& path,
                   std::shared_ptr<MetricsManager> metrics_manager,
-                  std::shared_ptr<DownloadScheduler> download_scheduler)
+                  std::shared_ptr<ResourceScheduler> download_scheduler)
       : client_(client),
         path_(path),
         metrics_manager_(metrics_manager),
@@ -537,7 +539,7 @@ class ObjectInputFile : public io::RandomAccessFile {
   int64_t pos_ = 0;
   int64_t content_length_ = -1;
   std::shared_ptr<MetricsManager> metrics_manager_;
-  std::shared_ptr<DownloadScheduler> download_scheduler_;
+  std::shared_ptr<ResourceScheduler> download_scheduler_;
 };
 
 // Minimum size for each part of a multipart upload, except for the last part.
@@ -1235,17 +1237,18 @@ class S3FileSystem::Impl {
   }
 };
 
-S3FileSystem::S3FileSystem(const S3Options& options)
+S3FileSystem::S3FileSystem(const S3Options& options, ResourceScheduler* scheduler)
     : impl_(new Impl{options}),
       metrics_manager_(new MetricsManager()),
-      download_scheduler_(new DownloadScheduler()) {}
+      download_scheduler_(scheduler) {}
 
 S3FileSystem::~S3FileSystem() {}
 
-Result<std::shared_ptr<S3FileSystem>> S3FileSystem::Make(const S3Options& options) {
+Result<std::shared_ptr<S3FileSystem>> S3FileSystem::Make(const S3Options& options,
+                                                         ResourceScheduler* scheduler) {
   RETURN_NOT_OK(CheckS3Initialized());
 
-  std::shared_ptr<S3FileSystem> ptr(new S3FileSystem(options));
+  std::shared_ptr<S3FileSystem> ptr(new S3FileSystem(options, scheduler));
   RETURN_NOT_OK(ptr->impl_->Init());
   return ptr;
 }
@@ -1539,19 +1542,19 @@ Result<std::shared_ptr<io::OutputStream>> S3FileSystem::OpenAppendStream(
 
 std::shared_ptr<MetricsManager> S3FileSystem::GetMetrics() { return metrics_manager_; }
 
-std::shared_ptr<DownloadScheduler> S3FileSystem::GetDownloadScheduler() {
+std::shared_ptr<ResourceScheduler> S3FileSystem::GetResourceScheduler() {
   return download_scheduler_;
 }
 
 void MetricsManager::Print() const {
   // event timing stats
   std::lock_guard<std::mutex> guard(metrics_mutex_);
-  std::map<std::thread::id, std::vector<arrow::fs::MetricEvent>> thread_map;
+  std::map<std::thread::id, std::vector<MetricEvent>> thread_map;
   for (const auto& event : events_) {
     thread_map[event.thread_id].push_back(event);
   }
 
-  std::multimap<int64_t, std::vector<arrow::fs::MetricEvent>> sorted_threads;
+  std::multimap<int64_t, std::vector<MetricEvent>> sorted_threads;
   for (const auto& thread : thread_map) {
     auto metric_events = thread.second;
     std::sort(metric_events.begin(), metric_events.end(),
@@ -1600,5 +1603,6 @@ Status MetricsManager::AddRead(int64_t read_size) {
   return Status::OK();
 }
 
+}  // namespace fork
 }  // namespace fs
 }  // namespace arrow

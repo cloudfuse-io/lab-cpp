@@ -7,7 +7,8 @@ add_subdirectory(util)
 
 set(BUZZ_TARGET "buzz-${BUZZ_BUILD_FILE}-${BUZZ_BUILD_TYPE}")
 
-if(${BUZZ_BUILD_FILE})
+if(BUZZ_BUILD_FILE)
+  MESSAGE(STATUS "Packaging ${BUZZ_BUILD_FILE}")
   add_executable(${BUZZ_TARGET} tests/${BUZZ_BUILD_FILE}.cc)
 
   target_link_libraries(${BUZZ_TARGET}
@@ -22,5 +23,7 @@ if(${BUZZ_BUILD_FILE})
   )
 
   aws_lambda_package_target(${BUZZ_TARGET} NO_LIBC)
+else()
+  MESSAGE(STATUS "Not packaging any executable")
 endif()
 

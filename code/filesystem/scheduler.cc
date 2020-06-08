@@ -4,7 +4,7 @@
 
 #include "arrow/result.h"
 #include "arrow/status.h"
-#include "various.h"
+#include "toolbox.h"
 
 namespace arrow {
 namespace fs {

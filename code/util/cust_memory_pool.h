@@ -20,9 +20,14 @@
 #include <string>
 
 #include "arrow/memory_pool.h"
+#include "arrow/result.h"
 #include "arrow/status.h"
 
 namespace arrow {
+
+inline constexpr int64_t HUGE_ALLOC_THRESHOLD_BYTES = 1024 * 1024;
+inline constexpr int64_t SMALL_ALLOC_THRESHOLD_BYTES = 256 * 1024;
+inline constexpr int64_t HUGE_ALLOC_RUNWAY_SIZE_BYTES = 1024 * 1024 * 1024;
 
 /// Derived class for memory allocation.
 ///
@@ -41,6 +46,8 @@ class ARROW_EXPORT CustomMemoryPool : public MemoryPool {
   int64_t bytes_allocated() const override;
 
   int64_t max_memory() const override;
+
+  int64_t copied_bytes() const;
 
   std::string backend_name() const override;
 

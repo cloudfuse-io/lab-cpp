@@ -20,6 +20,7 @@
 #include <stdlib.h>
 
 #include <chrono>
+#include <cstring>
 #include <string>
 
 namespace util {
@@ -39,6 +40,14 @@ inline int64_t getenv_int(const char* name, int64_t def) {
     return def;
   }
   return std::stoi(raw_var);
+}
+
+inline int64_t getenv_bool(const char* name, bool def) {
+  auto raw_var = ::getenv(name);
+  if (raw_var == nullptr) {
+    return def;
+  }
+  return strcmp(raw_var, "true") == 0;
 }
 
 inline const char* getenv(const char* name, const char* def) {

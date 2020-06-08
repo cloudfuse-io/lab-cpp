@@ -12,7 +12,7 @@
 #include <unordered_set>
 
 // #include "jemalloc_ep/dist/include/jemalloc/jemalloc.h"
-#include "various.h"
+#include "toolbox.h"
 
 extern char* je_arrow_malloc_conf;
 constexpr int64_t PAGE_SIZE = 4 * 1024;
@@ -60,11 +60,10 @@ static aws::lambda_runtime::invocation_response my_handler(
 }
 
 int main() {
-  bool is_local = getenv("IS_LOCAL") != NULL && strcmp(getenv("IS_LOCAL"), "true") == 0;
   auto handler_lambda = [](aws::lambda_runtime::invocation_request const& req) {
     return my_handler(req);
   };
-  if (is_local) {
+  if (util::getenv_bool("IS_LOCAL", false)) {
     aws::lambda_runtime::invocation_response response =
         handler_lambda(aws::lambda_runtime::invocation_request());
     std::cout << response.get_payload() << std::endl;

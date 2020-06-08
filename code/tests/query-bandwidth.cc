@@ -10,7 +10,7 @@
 #include <iostream>
 
 #include "s3fs-forked.h"
-#include "various.h"
+#include "toolbox.h"
 
 int64_t download_chunck(std::shared_ptr<arrow::io::RandomAccessFile> infile,
                         int64_t start, int64_t nbbytes) {
@@ -23,7 +23,7 @@ int64_t download_chunck(std::shared_ptr<arrow::io::RandomAccessFile> infile,
 }
 
 static aws::lambda_runtime::invocation_response my_handler(
-    std::shared_ptr<arrow::fs::S3FileSystem> fs,
+    std::shared_ptr<arrow::fs::fork::S3FileSystem> fs,
     aws::lambda_runtime::invocation_request const& req) {
   std::vector<std::string> file_names{
       "bb-test-data-dev/bid-large.parquet",
@@ -68,20 +68,22 @@ static aws::lambda_runtime::invocation_response my_handler(
 
 int main() {
   // init SDK
-  arrow::fs::S3GlobalOptions global_options;
-  global_options.log_level = arrow::fs::S3LogLevel::Warn;
+  arrow::fs::fork::S3GlobalOptions global_options;
+  global_options.log_level = arrow::fs::fork::S3LogLevel::Warn;
   PARQUET_THROW_NOT_OK(InitializeS3(global_options));
   // init s3 client
-  arrow::fs::S3Options options = arrow::fs::S3Options::Defaults();
+  arrow::fs::fork::S3Options options = arrow::fs::fork::S3Options::Defaults();
   options.region = "eu-west-1";
-  bool is_local = getenv("IS_LOCAL") != NULL && strcmp(getenv("IS_LOCAL"), "true") == 0;
+  bool is_local = util::getenv_bool("IS_LOCAL", false);
   if (is_local) {
     options.endpoint_override = "minio:9000";
     std::cout << "endpoint_override=" << options.endpoint_override << std::endl;
     options.scheme = "http";
   }
-  std::shared_ptr<arrow::fs::S3FileSystem> fs;
-  PARQUET_ASSIGN_OR_THROW(fs, arrow::fs::S3FileSystem::Make(options));
+  std::shared_ptr<arrow::fs::fork::S3FileSystem> fs;
+  // TODO better pointer lifecycle
+  PARQUET_ASSIGN_OR_THROW(fs, arrow::fs::fork::S3FileSystem::Make(
+                                  options, new arrow::fs::fork::ResourceScheduler(1, 1)));
   auto handler_lambda = [fs](aws::lambda_runtime::invocation_request const& req) {
     return my_handler(fs, req);
   };

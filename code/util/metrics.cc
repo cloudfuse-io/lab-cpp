@@ -27,60 +27,79 @@ namespace util {
 
 using namespace arrow;
 
-void MetricsManager::Print() const {
-  // event timing stats
-  std::lock_guard<std::mutex> guard(metrics_mutex_);
-  std::map<std::thread::id, std::vector<MetricEvent>> thread_map;
-  for (const auto& event : events_) {
-    thread_map[event.thread_id].push_back(event);
-  }
+class MetricsManager::Impl {
+ public:
+  mutable std::mutex metrics_mutex_;
+  std::vector<MetricEvent> events_;
+  std::vector<int64_t> reads_;
+  std::chrono::_V2::system_clock::time_point ref_time =
+      std::chrono::high_resolution_clock::now();
 
-  std::multimap<int64_t, std::vector<MetricEvent>> sorted_threads;
-  for (const auto& thread : thread_map) {
-    auto metric_events = thread.second;
-    std::sort(metric_events.begin(), metric_events.end(),
-              [](MetricEvent const& a, MetricEvent const& b) -> bool {
-                return a.time < b.time;
-              });
-    auto first_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-                          metric_events[0].time - ref_time)
-                          .count();
-    sorted_threads.insert({first_time, metric_events});
-  }
-
-  for (const auto& thread : sorted_threads) {
-    std::cout << thread.second[0].thread_id;
-    auto previous_time = ref_time;
-    for (const auto& event : thread.second) {
-      std::cout << ",";
-      std::cout << ::util::get_duration_ms(previous_time, event.time);
-      previous_time = event.time;
+  void PrintEvents() const {
+    // event timing stats
+    std::lock_guard<std::mutex> guard(metrics_mutex_);
+    std::map<std::thread::id, std::vector<MetricEvent>> thread_map;
+    for (const auto& event : events_) {
+      thread_map[event.thread_id].push_back(event);
     }
-    std::cout << std::endl;
+
+    std::multimap<int64_t, std::vector<MetricEvent>> sorted_threads;
+    for (const auto& thread : thread_map) {
+      auto metric_events = thread.second;
+      std::sort(metric_events.begin(), metric_events.end(),
+                [](MetricEvent const& a, MetricEvent const& b) -> bool {
+                  return a.time < b.time;
+                });
+      auto first_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            metric_events[0].time - ref_time)
+                            .count();
+      sorted_threads.insert({first_time, metric_events});
+    }
+
+    for (const auto& thread : sorted_threads) {
+      std::cout << thread.second[0].thread_id;
+      auto previous_time = ref_time;
+      for (const auto& event : thread.second) {
+        std::cout << ",";
+        std::cout << ::util::get_duration_ms(previous_time, event.time);
+        previous_time = event.time;
+      }
+      std::cout << std::endl;
+    }
+
+    // size stats
+    auto total_dl = 0;
+    for (auto dl : reads_) {
+      total_dl += dl;
+    }
+    std::cout << "nb_dl," << reads_.size() << ",bytes_dl," << total_dl << std::endl;
   }
 
-  // size stats
-  auto total_dl = 0;
-  for (auto dl : reads_) {
-    total_dl += dl;
+  Status NewEvent(std::string type) {
+    MetricEvent event{
+        std::chrono::high_resolution_clock::now(),
+        std::this_thread::get_id(),
+        type,
+    };
+    std::lock_guard<std::mutex> guard(metrics_mutex_);
+    events_.push_back(event);
+    return Status::OK();
   }
-  std::cout << "nb_dl," << reads_.size() << ",bytes_dl," << total_dl << std::endl;
-}
 
-Status MetricsManager::NewEvent(std::string type) {
-  MetricEvent event{
-      std::chrono::high_resolution_clock::now(),
-      std::this_thread::get_id(),
-      type,
-  };
-  std::lock_guard<std::mutex> guard(metrics_mutex_);
-  events_.push_back(event);
-  return Status::OK();
-}
+  Status AddRead(int64_t read_size) {
+    std::lock_guard<std::mutex> guard(metrics_mutex_);
+    reads_.push_back(read_size);
+    return Status::OK();
+  }
+};
 
-Status MetricsManager::AddRead(int64_t read_size) {
-  std::lock_guard<std::mutex> guard(metrics_mutex_);
-  reads_.push_back(read_size);
-  return Status::OK();
-}
+MetricsManager::MetricsManager() : impl_(new Impl{}) {}
+MetricsManager::~MetricsManager() {}
+
+void MetricsManager::Print() const { impl_->PrintEvents(); }
+
+Status MetricsManager::NewEvent(std::string type) { return impl_->NewEvent(type); }
+
+Status MetricsManager::AddRead(int64_t read_size) { return impl_->AddRead(read_size); }
+
 }  // namespace util

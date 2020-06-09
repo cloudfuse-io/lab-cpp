@@ -864,6 +864,8 @@ class S3FileSystem::Impl {
   Aws::Client::ClientConfiguration client_config_;
   Aws::Auth::AWSCredentials credentials_;
   std::unique_ptr<Aws::S3::S3Client> client_;
+  std::shared_ptr<::util::MetricsManager> metrics_manager_;
+  std::shared_ptr<::util::ResourceScheduler> resource_scheduler_;
 
   const int32_t kListObjectsMaxKeys = 1000;
   // At most 1000 keys per multiple-delete request
@@ -871,7 +873,11 @@ class S3FileSystem::Impl {
   // Limit recursing depth, since a recursion bomb can be created
   const int32_t kMaxNestingDepth = 100;
 
-  explicit Impl(S3Options options) : options_(std::move(options)) {}
+  explicit Impl(S3Options options, std::shared_ptr<::util::MetricsManager> metrics,
+                std::shared_ptr<::util::ResourceScheduler> scheduler)
+      : options_(std::move(options)),
+        metrics_manager_(metrics),
+        resource_scheduler_(scheduler) {}
 
   Status Init() {
     credentials_ = options_.credentials_provider->GetAWSCredentials();
@@ -1240,9 +1246,7 @@ class S3FileSystem::Impl {
 S3FileSystem::S3FileSystem(const S3Options& options,
                            std::shared_ptr<::util::ResourceScheduler> scheduler,
                            std::shared_ptr<::util::MetricsManager> metrics)
-    : impl_(new Impl{options}),
-      metrics_manager_(metrics),
-      resource_scheduler_(scheduler) {}
+    : impl_(new Impl{options, metrics, scheduler}) {}
 
 S3FileSystem::~S3FileSystem() {}
 
@@ -1505,8 +1509,8 @@ Result<std::shared_ptr<io::InputStream>> S3FileSystem::OpenInputStream(
   RETURN_NOT_OK(S3Path::FromString(s, &path));
   RETURN_NOT_OK(ValidateFilePath(path));
 
-  auto ptr = std::make_shared<ObjectInputFile>(impl_->client_.get(), path,
-                                               metrics_manager_, resource_scheduler_);
+  auto ptr = std::make_shared<ObjectInputFile>(
+      impl_->client_.get(), path, impl_->metrics_manager_, impl_->resource_scheduler_);
   RETURN_NOT_OK(ptr->Init());
   return ptr;
 }
@@ -1517,8 +1521,8 @@ Result<std::shared_ptr<io::RandomAccessFile>> S3FileSystem::OpenInputFile(
   RETURN_NOT_OK(S3Path::FromString(s, &path));
   RETURN_NOT_OK(ValidateFilePath(path));
 
-  auto ptr = std::make_shared<ObjectInputFile>(impl_->client_.get(), path,
-                                               metrics_manager_, resource_scheduler_);
+  auto ptr = std::make_shared<ObjectInputFile>(
+      impl_->client_.get(), path, impl_->metrics_manager_, impl_->resource_scheduler_);
   RETURN_NOT_OK(ptr->Init());
   return ptr;
 }
@@ -1544,11 +1548,11 @@ Result<std::shared_ptr<io::OutputStream>> S3FileSystem::OpenAppendStream(
 }
 
 std::shared_ptr<::util::MetricsManager> S3FileSystem::GetMetrics() {
-  return metrics_manager_;
+  return impl_->metrics_manager_;
 }
 
 std::shared_ptr<::util::ResourceScheduler> S3FileSystem::GetResourceScheduler() {
-  return resource_scheduler_;
+  return impl_->resource_scheduler_;
 }
 
 }  // namespace fork

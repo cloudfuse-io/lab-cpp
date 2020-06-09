@@ -37,15 +37,14 @@ struct ARROW_EXPORT MetricEvent {
 
 class ARROW_EXPORT MetricsManager {
  public:
+  MetricsManager();
+  ~MetricsManager();
   void Print() const;
   Status NewEvent(std::string type);
   Status AddRead(int64_t read_size);
 
  private:
-  mutable std::mutex metrics_mutex_;
-  std::vector<MetricEvent> events_;
-  std::vector<int64_t> reads_;
-  std::chrono::_V2::system_clock::time_point ref_time =
-      std::chrono::high_resolution_clock::now();
+  class Impl;
+  std::unique_ptr<Impl> impl_;
 };
 }  // namespace util

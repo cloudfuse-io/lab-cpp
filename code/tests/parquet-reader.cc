@@ -104,7 +104,10 @@ std::shared_ptr<arrow::Table> read_single_column_parallel(
 
 static aws::lambda_runtime::invocation_response my_handler(
     aws::lambda_runtime::invocation_request const& req) {
-  // std::cout << "je_arrow_malloc_conf:" << je_arrow_malloc_conf << std::endl;
+  auto scheduler =
+      std::make_shared<util::ResourceScheduler>(MAX_CONCURRENT_DL, MAX_CONCURRENT_PROC);
+  auto metrics = std::make_shared<util::MetricsManager>();
+
   //// setup s3fs ////
   arrow::fs::fork::S3Options options = arrow::fs::fork::S3Options::Defaults();
   options.region = "eu-west-1";
@@ -114,12 +117,8 @@ static aws::lambda_runtime::invocation_response my_handler(
     std::cout << "endpoint_override=" << options.endpoint_override << std::endl;
     options.scheme = "http";
   }
-  std::shared_ptr<arrow::fs::fork::S3FileSystem> fs;
-  auto scheduler =
-      std::make_shared<util::ResourceScheduler>(MAX_CONCURRENT_DL, MAX_CONCURRENT_PROC);
-  auto metrics = std::make_shared<util::MetricsManager>();
   PARQUET_ASSIGN_OR_THROW(
-      fs, arrow::fs::fork::S3FileSystem::Make(options, scheduler, metrics));
+      auto fs, arrow::fs::fork::S3FileSystem::Make(options, scheduler, metrics));
 
   std::vector<std::string> file_names{
       "bb-test-data-dev/bid-large.parquet",

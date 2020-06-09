@@ -35,7 +35,7 @@
 static const int64_t MAX_CONCURRENT_DL = util::getenv_int("MAX_CONCURRENT_DL", 8);
 static const int64_t MAX_CONCURRENT_PROC = util::getenv_int("MAX_CONCURRENT_PROC", 1);
 static const int64_t COLUMN_ID = util::getenv_int("COLUMN_ID", 16);
-static const bool AS_DICT = util::getenv_bool("AS_DICT", false);
+static const bool AS_DICT = util::getenv_bool("AS_DICT", true);
 static const auto mem_pool = new arrow::CustomMemoryPool(arrow::default_memory_pool());
 
 // helper
@@ -59,6 +59,9 @@ std::unique_ptr<parquet::arrow::FileReader> get_column(
 std::shared_ptr<arrow::Table> read_single_column_parallel(
     std::unique_ptr<parquet::arrow::FileReader> reader,
     std::shared_ptr<arrow::fs::fork::S3FileSystem> fs, int64_t col_index) {
+  std::shared_ptr<arrow::Schema> full_schema;
+  PARQUET_THROW_NOT_OK(reader->GetSchema(&full_schema));
+  std::cout << "col processed: " << full_schema->field_names()[col_index] << std::endl;
   // start rowgroup read at the same time
   std::shared_ptr<parquet::arrow::FileReader> shared_reader(std::move(reader));
   std::vector<std::future<std::shared_ptr<arrow::ChunkedArray>>> rg_futures;
@@ -84,20 +87,18 @@ std::shared_ptr<arrow::Table> read_single_column_parallel(
     array_vect.insert(array_vect.end(), rowgroup_vect.begin(), rowgroup_vect.end());
   }
   // project schema
-  std::shared_ptr<arrow::Schema> full_schema;
-  PARQUET_THROW_NOT_OK(shared_reader->GetSchema(&full_schema));
   auto schema =
       arrow::schema({full_schema->fields()[col_index]}, full_schema->metadata());
   // merge rowgroups back into a table
   auto chuncked_column = std::make_shared<arrow::ChunkedArray>(array_vect);
   auto table = arrow::Table::Make(schema, {chuncked_column});
-  // // compute sum with kernel
+  // compute sum with kernel
   // auto function_context = arrow::compute::FunctionContext();
   // auto column_datum = arrow::compute::Datum(table->GetColumnByName("cpm"));
   // arrow::compute::Datum result_datum;
-  // PARQUET_THROW_NOT_OK(arrow::compute::Sum(&function_context, column_datum,
-  // &result_datum)); std::cout << "sum:" << result_datum.scalar()->ToString() <<
-  // std::endl;
+  // PARQUET_THROW_NOT_OK(
+  //     arrow::compute::Sum(&function_context, column_datum, &result_datum));
+  // std::cout << "sum:" << result_datum.scalar()->ToString() << std::endl;
   return table;
 }
 
@@ -151,9 +152,6 @@ static aws::lambda_runtime::invocation_response my_handler(
     // << std::endl;
 
     //// read from s3 ////
-    // read_whole_file(std::move(reader));
-    // read_single_column_chunk(std::move(reader), "cpm");
-    // read_single_column(std::move(reader), "cpm");
     auto table = read_single_column_parallel(std::move(reader), fs, COLUMN_ID);
     std::cout << "HUGE_ALLOC_THRESHOLD_BYTES:" << arrow::HUGE_ALLOC_THRESHOLD_BYTES
               << std::endl;
@@ -186,50 +184,3 @@ int main() {
   }
   return 0;
 }
-
-// #3: Read an entire column chuck by chuck
-// void read_single_column_parallel(std::unique_ptr<parquet::arrow::FileReader> reader,
-// std::string col_name)
-// {
-//   std::cout << "Reading first ColumnChunk of the first RowGroup"
-//             << std::endl;
-
-//   int col_index;
-//   reader = get_column(std::move(reader), col_name, col_index);
-//   std::cout << "id of " << col_name << " : " << col_index << std::endl;
-
-//   // get rowgroups one by one
-//   auto t1 = std::chrono::high_resolution_clock::now();
-//   arrow::ArrayVector array_vect;
-//   array_vect.reserve(reader->num_row_groups());
-//   for (int i=0; i<reader->num_row_groups(); i++) {
-//     std::shared_ptr<arrow::ChunkedArray> array;
-//     PARQUET_THROW_NOT_OK(reader->RowGroup(i)->Column(col_index)->Read(&array));
-//     auto rowgroup_vect = array->chunks();
-//     array_vect.insert(array_vect.end(), rowgroup_vect.begin(), rowgroup_vect.end());
-//   }
-
-//   // project schema
-//   std::shared_ptr<arrow::Schema> full_schema;
-//   PARQUET_THROW_NOT_OK(reader->GetSchema(&full_schema));
-//   auto schema = arrow::schema({full_schema->fields()[col_index]},
-//   full_schema->metadata()); std::cout << "schema->ToString(true):" <<
-//   schema->ToString(true) << std::endl;
-//   // merge rowgroups back into a table
-//   auto chuncked_column = std::make_shared<arrow::ChunkedArray>(array_vect);
-//   auto table = arrow::Table::Make(schema, {chuncked_column});
-//   auto t2 = std::chrono::high_resolution_clock::now();
-//   std::cout << "read duration: " << get_duration(t1, t2) << std::endl;
-//   std::cout << "table->num_rows:" << table->num_rows() << std::endl;
-//   std::cout << "table->num_columns:" << table->num_columns() << std::endl;
-//   // compute sum with kernel
-//   auto function_context = arrow::compute::FunctionContext();
-//   auto column_datum = arrow::compute::Datum(table->GetColumnByName("cpm"));
-//   arrow::compute::Datum result_datum;
-//   PARQUET_THROW_NOT_OK(arrow::compute::Sum(&function_context, column_datum,
-//   &result_datum)); auto t3 = std::chrono::high_resolution_clock::now(); std::cout <<
-//   "sum duration: " << get_duration(t2, t3) << std::endl; std::cout << "sum:" <<
-//   result_datum.scalar()->ToString() << std::endl;
-
-//   std::cout << std::endl;
-// }

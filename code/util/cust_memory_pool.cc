@@ -28,12 +28,19 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <queue>
 
 #include "arrow/memory_pool.h"
 #include "arrow/result.h"
 #include "arrow/status.h"
 
-#define ACTIVATE_RUNWAY_ALLOCATOR
+// #define ACTIVATE_RUNWAY_ALLOCATOR
+#define ACTIVATE_POOL_ALLOCATOR
+// #define ACTIVATE_ALLOCATION_LINKING
+// #define ACTIVATE_ALLOCATION_PRINTING
+
+static constexpr int64_t PREALLOC_SIZE_BYTES = 1024 * 1024;
+static constexpr int64_t PREALLOC_COUNT = 1500;
 
 namespace arrow {
 
@@ -78,6 +85,78 @@ class guarded_map {
   }
 };
 
+class linked_set {
+  using Node = std::pair<uint8_t*, int64_t>;
+
+ private:
+  std::vector<std::vector<Node>> vect_vect_;
+  mutable std::mutex mutex_;
+
+ public:
+  void add(uint8_t* old_key, uint8_t* new_key, int64_t value) {
+#ifdef ACTIVATE_ALLOCATION_LINKING
+    for (auto& node_vect : vect_vect_) {
+      if (node_vect[node_vect.size() - 1].first == old_key) {
+        node_vect.push_back({new_key, value});
+        return;
+      }
+    }
+    std::vector<Node> new_node_vect;
+    new_node_vect.push_back({new_key, value});
+    vect_vect_.push_back(new_node_vect);
+#endif
+  }
+
+  void print() const {
+#ifdef ACTIVATE_ALLOCATION_LINKING
+    std::lock_guard<std::mutex> lk(mutex_);
+    for (auto node_vect : vect_vect_) {
+      uint8_t* prev_addr = nullptr;
+      int64_t prev_size = 0;
+      for (auto node : node_vect) {
+        std::string sep;
+        if (node.second >= prev_size) {
+          sep = "+";
+        } else {
+          sep = "-";
+        }
+        if (node.first == prev_addr) {
+          std::cout << sep;
+        } else {
+          std::cout << sep << sep;
+        }
+        std::cout << node.second;
+        prev_addr = node.first;
+        prev_size = node.second;
+      }
+      std::cout << std::endl;
+    }
+#endif
+  }
+};
+
+class guarded_queue {
+ private:
+  std::queue<uint8_t*> queue_;
+  mutable std::mutex mutex_;
+
+ public:
+  uint8_t* pop() {
+    std::lock_guard<std::mutex> lk(mutex_);
+    if (queue_.size() == 0) {
+      return nullptr;
+    }
+    auto res = queue_.front();
+    queue_.pop();
+    return res;
+  }
+
+  void push(uint8_t* key) {
+    std::lock_guard<std::mutex> lk(mutex_);
+    queue_.push(key);
+  }
+};
+
 class CustomMemoryPool::CustomMemoryPoolImpl {
  public:
   explicit CustomMemoryPoolImpl(MemoryPool* pool) : pool_(pool) {
@@ -86,45 +165,93 @@ class CustomMemoryPool::CustomMemoryPoolImpl {
 #else
     std::cout << "ACTIVATE_RUNWAY_ALLOCATOR = OFF" << std::endl;
 #endif
+#ifdef ACTIVATE_POOL_ALLOCATOR
+    for (int i = 0; i < PREALLOC_COUNT; i++) {
+      void* raw_ptr =
+          mmap(nullptr,  // attribute address automatically
+               PREALLOC_SIZE_BYTES, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, 0, 0);
+      pool_allocs_.push(reinterpret_cast<uint8_t*>(raw_ptr));
+      memset(raw_ptr, 1, static_cast<size_t>(PREALLOC_SIZE_BYTES));
+    }
+    std::cout << "ACTIVATE_POOL_ALLOCATOR = ON" << std::endl;
+#else
+    std::cout << "ACTIVATE_POOL_ALLOCATOR = OFF" << std::endl;
+#endif
   }
 
   Status Allocate(int64_t size, uint8_t** out) {
+#ifdef ACTIVATE_ALLOCATION_PRINTING
     if (size > 0) {
       std::cout << "Allocate," << size << "," << size << "," << 0 << std::endl;
     }
+#endif
 #ifdef ACTIVATE_RUNWAY_ALLOCATOR
     if (size >= HUGE_ALLOC_THRESHOLD_BYTES) {
-      return custom_allocate(size, out);
+      auto status = runway_allocate(size, out);
+      linked_allocs_.add(nullptr, *out, size);
+      return status;
     }
 #endif
-    return pool_->Allocate(size, out);
+#ifdef ACTIVATE_POOL_ALLOCATOR
+    if (size > 0) {
+      auto status = pool_allocate(size, out);
+      linked_allocs_.add(nullptr, *out, size);
+      return status;
+    }
+#endif
+    auto status = pool_->Allocate(size, out);
+    linked_allocs_.add(nullptr, *out, size);
+    return status;
   }
 
   Status Reallocate(int64_t old_size, int64_t new_size, uint8_t** ptr) {
+    uint8_t* previous_ptr = *ptr;
 #ifdef ACTIVATE_RUNWAY_ALLOCATOR
     if (old_size >= SMALL_ALLOC_THRESHOLD_BYTES ||
         new_size >= HUGE_ALLOC_THRESHOLD_BYTES) {
       // this seems to be meat for the custom allocator
-      auto result = custom_reallocate(old_size, new_size, ptr);
+      auto result = runway_reallocate(old_size, new_size, ptr);
       RETURN_NOT_OK(result.status());
       if (result.ValueOrDie()) {
+        linked_allocs_.add(previous_ptr, *ptr, new_size);
+        print_realloc(old_size, new_size, previous_ptr, *ptr);
         return Status::OK();
       }
     }
 #endif
-    uint8_t* previous_ptr = *ptr;
+#ifdef ACTIVATE_POOL_ALLOCATOR
+    if (new_size > 0) {
+      // this seems to be meat for the custom allocator
+      auto result = pool_reallocate(old_size, new_size, ptr);
+      RETURN_NOT_OK(result.status());
+      if (result.ValueOrDie()) {
+        linked_allocs_.add(previous_ptr, *ptr, new_size);
+        print_realloc(old_size, new_size, previous_ptr, *ptr);
+        return Status::OK();
+      }
+    }
+#endif
     RETURN_NOT_OK(pool_->Reallocate(old_size, new_size, ptr));
-    print_realloc(old_size, new_size, previous_ptr != *ptr);
+    linked_allocs_.add(previous_ptr, *ptr, new_size);
+    print_realloc(old_size, new_size, previous_ptr, *ptr);
     return Status::OK();
   }
 
   void Free(uint8_t* buffer, int64_t size) {
+#ifdef ACTIVATE_ALLOCATION_PRINTING
     if (size > 0) {
       std::cout << "Free," << -size << "," << 0 << "," << size << std::endl;
     }
+#endif
 #ifdef ACTIVATE_RUNWAY_ALLOCATOR
     if (size >= SMALL_ALLOC_THRESHOLD_BYTES) {
-      custom_free(buffer, size);
+      runway_free(buffer, size);
+      return;
+    }
+#endif
+#ifdef ACTIVATE_POOL_ALLOCATOR
+    if (size > 0) {
+      pool_free(buffer, size);
       return;
     }
 #endif
@@ -132,10 +259,11 @@ class CustomMemoryPool::CustomMemoryPoolImpl {
   }
 
   int64_t bytes_allocated() const {
+    linked_allocs_.print();
     return pool_->bytes_allocated() + large_allocs_.sum();
   }
 
-  int64_t max_memory() const { throw "Not implemented yet"; }
+  int64_t max_memory() const { throw "Not implemented yet."; }
 
   std::string backend_name() const { return pool_->backend_name() + "_custom"; }
 
@@ -144,8 +272,10 @@ class CustomMemoryPool::CustomMemoryPoolImpl {
  private:
   MemoryPool* pool_;
   guarded_map large_allocs_;
+  linked_set linked_allocs_;
+  guarded_queue pool_allocs_;
 
-  Status custom_allocate(int64_t size, uint8_t** out) {
+  Status runway_allocate(int64_t size, uint8_t** out) {
     void* raw_ptr = mmap(nullptr,  // attribute address automatically
                          HUGE_ALLOC_RUNWAY_SIZE_BYTES, PROT_READ | PROT_WRITE,
                          MAP_ANON | MAP_PRIVATE, 0, 0);
@@ -154,19 +284,30 @@ class CustomMemoryPool::CustomMemoryPoolImpl {
     return Status::OK();
   }
 
-  Result<bool> custom_reallocate(int64_t old_size, int64_t new_size, uint8_t** ptr) {
+  Status pool_allocate(int64_t size, uint8_t** out) {
+    if (size > PREALLOC_SIZE_BYTES) {
+      return Status::ExecutionError("Allocation larger than PREALLOC_SIZE_BYTES");
+    }
+    auto alloc = pool_allocs_.pop();
+    if (alloc != nullptr) {
+      *out = alloc;
+      return Status::OK();
+    } else {
+      return Status::ExecutionError("no more alloc in pool");
+    }
+  }
+
+  Result<bool> runway_reallocate(int64_t old_size, int64_t new_size, uint8_t** ptr) {
     uint8_t* previous_ptr = *ptr;
     bool allocation_done = false;
     if (large_allocs_.contains(*ptr)) {
       // already managed by the custom allocator
       if (new_size < SMALL_ALLOC_THRESHOLD_BYTES) {
         // got so small than we return it to inner allocator
-        print_realloc(old_size, new_size, true);
         pool_->Allocate(new_size, ptr);
         memcpy(*ptr, previous_ptr, new_size);
-        custom_free(previous_ptr, old_size);
+        runway_free(previous_ptr, old_size);
       } else {
-        print_realloc(old_size, new_size, false);
         large_allocs_.set(*ptr, new_size);
         if (new_size < old_size) {
           // size shrinked so give unused pages back to the OS
@@ -183,8 +324,7 @@ class CustomMemoryPool::CustomMemoryPoolImpl {
       allocation_done = true;
     } else if (new_size >= HUGE_ALLOC_THRESHOLD_BYTES) {
       // from now on manage with custom allocator
-      print_realloc(old_size, new_size, true);
-      RETURN_NOT_OK(custom_allocate(new_size, ptr));
+      RETURN_NOT_OK(runway_allocate(new_size, ptr));
       memcpy(*ptr, previous_ptr, old_size);
       pool_->Free(previous_ptr, old_size);
 
@@ -193,21 +333,35 @@ class CustomMemoryPool::CustomMemoryPoolImpl {
     return allocation_done;
   }
 
-  void custom_free(uint8_t* buffer, int64_t size) {
+  Result<bool> pool_reallocate(int64_t old_size, int64_t new_size, uint8_t** ptr) {
+    if (old_size == 0) {
+      RETURN_NOT_OK(pool_allocate(new_size, ptr));
+    } else if (new_size > PREALLOC_SIZE_BYTES) {
+      return Status::ExecutionError("Reallocation larger than PREALLOC_SIZE_BYTES");
+    }
+    return true;
+  }
+
+  void runway_free(uint8_t* buffer, int64_t size) {
     auto is_erased = large_allocs_.erase(buffer);
     if (is_erased) {
       munmap(buffer, HUGE_ALLOC_RUNWAY_SIZE_BYTES);
     }
   }
 
-  void print_realloc(int64_t old_size, int64_t new_size, bool is_copy) {
-    if (is_copy) {
+  void pool_free(uint8_t* buffer, int64_t size) { pool_allocs_.push(buffer); }
+
+  void print_realloc(int64_t old_size, int64_t new_size, uint8_t* old_ptr,
+                     uint8_t* new_ptr) {
+#ifdef ACTIVATE_ALLOCATION_PRINTING
+    if (old_ptr != new_ptr) {
       copied_bytes_ += old_size;
       std::cout << "ReallocateCopy,";
     } else {
       std::cout << "Reallocate,";
     }
     std::cout << new_size - old_size << "," << new_size << "," << old_size << std::endl;
+#endif
   }
 };
 

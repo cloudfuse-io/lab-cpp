@@ -17,7 +17,7 @@ module "parquet-reader-static" {
     MAX_CONCURRENT_DL : 8
     MAX_CONCURRENT_PROC : 1
     COLUMN_ID : 16
-    AS_DICT : "false"
+    AS_DICT : "true"
   }
 }
 

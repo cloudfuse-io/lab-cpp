@@ -81,9 +81,10 @@ int main() {
     options.scheme = "http";
   }
   std::shared_ptr<arrow::fs::fork::S3FileSystem> fs;
-  // TODO better pointer lifecycle
-  PARQUET_ASSIGN_OR_THROW(fs, arrow::fs::fork::S3FileSystem::Make(
-                                  options, new arrow::fs::fork::ResourceScheduler(1, 1)));
+  auto scheduler = std::make_shared<util::ResourceScheduler>(1, 1);
+  auto metrics = std::make_shared<util::MetricsManager>();
+  PARQUET_ASSIGN_OR_THROW(
+      fs, arrow::fs::fork::S3FileSystem::Make(options, scheduler, metrics));
   auto handler_lambda = [fs](aws::lambda_runtime::invocation_request const& req) {
     return my_handler(fs, req);
   };

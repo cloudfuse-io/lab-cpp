@@ -1,5 +1,8 @@
-add_library (buzz-util STATIC cust_memory_pool.cc)
+add_library (buzz-util STATIC cust_memory_pool.cc metrics.cc scheduler.cc)
+target_include_directories(buzz-util PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 list(APPEND BUZZ_ALL buzz-util)
+
+# tests
 add_custom_target(cust_memory_pool-tests)
 list(APPEND BUZZ_ALL cust_memory_pool-tests)
 

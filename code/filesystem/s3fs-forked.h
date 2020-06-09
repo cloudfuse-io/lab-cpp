@@ -26,6 +26,7 @@
 #include "arrow/filesystem/filesystem.h"
 #include "arrow/util/macros.h"
 #include "arrow/util/uri.h"
+#include "metrics.h"
 #include "scheduler.h"
 
 namespace Aws {
@@ -85,26 +86,6 @@ struct ARROW_EXPORT S3Options {
                                    std::string* out_path = NULLPTR);
 };
 
-struct ARROW_EXPORT MetricEvent {
-  std::chrono::_V2::system_clock::time_point time;
-  std::thread::id thread_id;
-  std::string type;
-};
-
-class ARROW_EXPORT MetricsManager {
- public:
-  void Print() const;
-  Status NewEvent(std::string type);
-  Status AddRead(int64_t read_size);
-
- private:
-  mutable std::mutex metrics_mutex_;
-  std::vector<MetricEvent> events_;
-  std::vector<int64_t> reads_;
-  std::chrono::_V2::system_clock::time_point ref_time =
-      std::chrono::high_resolution_clock::now();
-};
-
 /// S3-backed FileSystem implementation.
 ///
 /// Some implementation notes:
@@ -162,20 +143,23 @@ class ARROW_EXPORT S3FileSystem : public FileSystem {
   Result<std::shared_ptr<io::OutputStream>> OpenAppendStream(
       const std::string& path) override;
 
-  std::shared_ptr<MetricsManager> GetMetrics();
-  std::shared_ptr<ResourceScheduler> GetResourceScheduler();
+  std::shared_ptr<::util::MetricsManager> GetMetrics();
+  std::shared_ptr<::util::ResourceScheduler> GetResourceScheduler();
 
   /// Create a S3FileSystem instance from the given options.
-  static Result<std::shared_ptr<S3FileSystem>> Make(const S3Options& options,
-                                                    ResourceScheduler* scheduler);
+  static Result<std::shared_ptr<S3FileSystem>> Make(
+      const S3Options& options, std::shared_ptr<::util::ResourceScheduler> scheduler,
+      std::shared_ptr<::util::MetricsManager> metrics);
 
  protected:
-  explicit S3FileSystem(const S3Options& options, ResourceScheduler* scheduler);
+  explicit S3FileSystem(const S3Options& options,
+                        std::shared_ptr<::util::ResourceScheduler> scheduler,
+                        std::shared_ptr<::util::MetricsManager> metrics);
 
   class Impl;
   std::unique_ptr<Impl> impl_;
-  std::shared_ptr<MetricsManager> metrics_manager_;
-  std::shared_ptr<ResourceScheduler> download_scheduler_;
+  std::shared_ptr<::util::MetricsManager> metrics_manager_;
+  std::shared_ptr<::util::ResourceScheduler> resource_scheduler_;
 };
 
 enum class S3LogLevel : int8_t { Off, Fatal, Error, Warn, Info, Debug, Trace };

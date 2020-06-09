@@ -5,11 +5,12 @@
 #include <unordered_set>
 
 #include "arrow/filesystem/filesystem.h"
+#include "arrow/status.h"
 #include "arrow/util/macros.h"
 
-namespace arrow {
-namespace fs {
-namespace fork {
+namespace util {
+
+using namespace arrow;
 
 class ARROW_EXPORT ResourceScheduler {
  public:
@@ -44,6 +45,4 @@ class ARROW_EXPORT ResourceScheduler {
   int16_t max_concurrent_proc_ = 1;
 };
 
-}  // namespace fork
-}  // namespace fs
-}  // namespace arrow
+}  // namespace util

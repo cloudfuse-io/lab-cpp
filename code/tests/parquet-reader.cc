@@ -115,10 +115,11 @@ static aws::lambda_runtime::invocation_response my_handler(
     options.scheme = "http";
   }
   std::shared_ptr<arrow::fs::fork::S3FileSystem> fs;
-  // TODO better pointer lifecycle ?
-  PARQUET_ASSIGN_OR_THROW(fs, arrow::fs::fork::S3FileSystem::Make(
-                                  options, new arrow::fs::fork::ResourceScheduler(
-                                               MAX_CONCURRENT_DL, MAX_CONCURRENT_PROC)));
+  auto scheduler =
+      std::make_shared<util::ResourceScheduler>(MAX_CONCURRENT_DL, MAX_CONCURRENT_PROC);
+  auto metrics = std::make_shared<util::MetricsManager>();
+  PARQUET_ASSIGN_OR_THROW(
+      fs, arrow::fs::fork::S3FileSystem::Make(options, scheduler, metrics));
 
   std::vector<std::string> file_names{
       "bb-test-data-dev/bid-large.parquet",

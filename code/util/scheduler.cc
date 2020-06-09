@@ -6,9 +6,9 @@
 #include "arrow/status.h"
 #include "toolbox.h"
 
-namespace arrow {
-namespace fs {
-namespace fork {
+namespace util {
+
+using namespace arrow;
 
 ResourceScheduler::ResourceScheduler(int16_t max_concurrent_dl,
                                      int16_t max_concurrent_proc) {
@@ -69,6 +69,4 @@ Status ResourceScheduler::NotifyProcessingDone() {
   return Status::OK();
 }
 
-}  // namespace fork
-}  // namespace fs
-}  // namespace arrow
+}  // namespace util

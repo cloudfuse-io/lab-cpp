@@ -400,12 +400,12 @@ Status GetObjectRange(Aws::S3::S3Client* client, const S3Path& path, int64_t sta
 class ObjectInputFile : public io::RandomAccessFile {
  public:
   ObjectInputFile(Aws::S3::S3Client* client, const S3Path& path,
-                  std::shared_ptr<MetricsManager> metrics_manager,
-                  std::shared_ptr<ResourceScheduler> download_scheduler)
+                  std::shared_ptr<::util::MetricsManager> metrics_manager,
+                  std::shared_ptr<::util::ResourceScheduler> resource_scheduler)
       : client_(client),
         path_(path),
         metrics_manager_(metrics_manager),
-        download_scheduler_(download_scheduler) {}
+        resource_scheduler_(resource_scheduler) {}
 
   Status Init() {
     // Issue a HEAD Object to get the content-length and ensure any
@@ -484,19 +484,19 @@ class ObjectInputFile : public io::RandomAccessFile {
     }
 
     ARROW_ASSIGN_OR_RAISE(bool is_synchronized,
-                          download_scheduler_->IsThreadRegisteredForSync());
+                          resource_scheduler_->IsThreadRegisteredForSync());
 
     // Read the desired range of bytes
     metrics_manager_->AddRead(nbytes);
     if (is_synchronized) {
-      download_scheduler_->WaitDownloadSlot();
+      resource_scheduler_->WaitDownloadSlot();
     }
     metrics_manager_->NewEvent("get_obj_start");
     RETURN_NOT_OK(GetObjectRange(client_, path_, position, nbytes, out));
     metrics_manager_->NewEvent("get_obj_end");
     if (is_synchronized) {
-      download_scheduler_->NotifyDownloadDone();
-      download_scheduler_->WaitProcessingSlot();
+      resource_scheduler_->NotifyDownloadDone();
+      resource_scheduler_->WaitProcessingSlot();
     }
     metrics_manager_->NewEvent("start_processing");
 
@@ -538,8 +538,8 @@ class ObjectInputFile : public io::RandomAccessFile {
   bool closed_ = false;
   int64_t pos_ = 0;
   int64_t content_length_ = -1;
-  std::shared_ptr<MetricsManager> metrics_manager_;
-  std::shared_ptr<ResourceScheduler> download_scheduler_;
+  std::shared_ptr<::util::MetricsManager> metrics_manager_;
+  std::shared_ptr<::util::ResourceScheduler> resource_scheduler_;
 };
 
 // Minimum size for each part of a multipart upload, except for the last part.
@@ -1237,18 +1237,21 @@ class S3FileSystem::Impl {
   }
 };
 
-S3FileSystem::S3FileSystem(const S3Options& options, ResourceScheduler* scheduler)
+S3FileSystem::S3FileSystem(const S3Options& options,
+                           std::shared_ptr<::util::ResourceScheduler> scheduler,
+                           std::shared_ptr<::util::MetricsManager> metrics)
     : impl_(new Impl{options}),
-      metrics_manager_(new MetricsManager()),
-      download_scheduler_(scheduler) {}
+      metrics_manager_(metrics),
+      resource_scheduler_(scheduler) {}
 
 S3FileSystem::~S3FileSystem() {}
 
-Result<std::shared_ptr<S3FileSystem>> S3FileSystem::Make(const S3Options& options,
-                                                         ResourceScheduler* scheduler) {
+Result<std::shared_ptr<S3FileSystem>> S3FileSystem::Make(
+    const S3Options& options, std::shared_ptr<::util::ResourceScheduler> scheduler,
+    std::shared_ptr<::util::MetricsManager> metrics) {
   RETURN_NOT_OK(CheckS3Initialized());
 
-  std::shared_ptr<S3FileSystem> ptr(new S3FileSystem(options, scheduler));
+  std::shared_ptr<S3FileSystem> ptr(new S3FileSystem(options, scheduler, metrics));
   RETURN_NOT_OK(ptr->impl_->Init());
   return ptr;
 }
@@ -1503,7 +1506,7 @@ Result<std::shared_ptr<io::InputStream>> S3FileSystem::OpenInputStream(
   RETURN_NOT_OK(ValidateFilePath(path));
 
   auto ptr = std::make_shared<ObjectInputFile>(impl_->client_.get(), path,
-                                               metrics_manager_, download_scheduler_);
+                                               metrics_manager_, resource_scheduler_);
   RETURN_NOT_OK(ptr->Init());
   return ptr;
 }
@@ -1515,7 +1518,7 @@ Result<std::shared_ptr<io::RandomAccessFile>> S3FileSystem::OpenInputFile(
   RETURN_NOT_OK(ValidateFilePath(path));
 
   auto ptr = std::make_shared<ObjectInputFile>(impl_->client_.get(), path,
-                                               metrics_manager_, download_scheduler_);
+                                               metrics_manager_, resource_scheduler_);
   RETURN_NOT_OK(ptr->Init());
   return ptr;
 }
@@ -1540,67 +1543,12 @@ Result<std::shared_ptr<io::OutputStream>> S3FileSystem::OpenAppendStream(
   return Status::NotImplemented("It is not possible to append efficiently to S3 objects");
 }
 
-std::shared_ptr<MetricsManager> S3FileSystem::GetMetrics() { return metrics_manager_; }
-
-std::shared_ptr<ResourceScheduler> S3FileSystem::GetResourceScheduler() {
-  return download_scheduler_;
+std::shared_ptr<::util::MetricsManager> S3FileSystem::GetMetrics() {
+  return metrics_manager_;
 }
 
-void MetricsManager::Print() const {
-  // event timing stats
-  std::lock_guard<std::mutex> guard(metrics_mutex_);
-  std::map<std::thread::id, std::vector<MetricEvent>> thread_map;
-  for (const auto& event : events_) {
-    thread_map[event.thread_id].push_back(event);
-  }
-
-  std::multimap<int64_t, std::vector<MetricEvent>> sorted_threads;
-  for (const auto& thread : thread_map) {
-    auto metric_events = thread.second;
-    std::sort(metric_events.begin(), metric_events.end(),
-              [](MetricEvent const& a, MetricEvent const& b) -> bool {
-                return a.time < b.time;
-              });
-    auto first_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-                          metric_events[0].time - ref_time)
-                          .count();
-    sorted_threads.insert({first_time, metric_events});
-  }
-
-  for (const auto& thread : sorted_threads) {
-    std::cout << thread.second[0].thread_id;
-    auto previous_time = ref_time;
-    for (const auto& event : thread.second) {
-      std::cout << ",";
-      std::cout << ::util::get_duration_ms(previous_time, event.time);
-      previous_time = event.time;
-    }
-    std::cout << std::endl;
-  }
-
-  // size stats
-  auto total_dl = 0;
-  for (auto dl : reads_) {
-    total_dl += dl;
-  }
-  std::cout << "nb_dl," << reads_.size() << ",bytes_dl," << total_dl << std::endl;
-}
-
-Status MetricsManager::NewEvent(std::string type) {
-  MetricEvent event{
-      std::chrono::high_resolution_clock::now(),
-      std::this_thread::get_id(),
-      type,
-  };
-  std::lock_guard<std::mutex> guard(metrics_mutex_);
-  events_.push_back(event);
-  return Status::OK();
-}
-
-Status MetricsManager::AddRead(int64_t read_size) {
-  std::lock_guard<std::mutex> guard(metrics_mutex_);
-  reads_.push_back(read_size);
-  return Status::OK();
+std::shared_ptr<::util::ResourceScheduler> S3FileSystem::GetResourceScheduler() {
+  return resource_scheduler_;
 }
 
 }  // namespace fork

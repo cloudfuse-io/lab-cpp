@@ -23,19 +23,18 @@
 #include <vector>
 
 #include "arrow/status.h"
-#include "arrow/util/visibility.h"
 
 namespace util {
 
 using namespace arrow;
 
-struct ARROW_EXPORT MetricEvent {
+struct MetricEvent {
   std::chrono::_V2::system_clock::time_point time;
   std::thread::id thread_id;
   std::string type;
 };
 
-class ARROW_EXPORT MetricsManager {
+class MetricsManager {
  public:
   MetricsManager();
   ~MetricsManager();

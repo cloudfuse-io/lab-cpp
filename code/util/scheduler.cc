@@ -28,13 +28,13 @@ class ResourceScheduler::Impl {
         max_concurrent_proc_(max_concurrent_proc) {}
 
   Status RegisterThreadForSync() {
-    std::unique_lock<std::mutex> lk(registered_thread_mutex_);
+    std::lock_guard<std::mutex> lk(registered_thread_mutex_);
     registered_threads_.insert(std::this_thread::get_id());
     return Status::OK();
   }
 
   Result<bool> IsThreadRegisteredForSync() {
-    std::unique_lock<std::mutex> lk(registered_thread_mutex_);
+    std::lock_guard<std::mutex> lk(registered_thread_mutex_);
     return registered_threads_.find(std::this_thread::get_id()) !=
            registered_threads_.end();
   }
@@ -48,7 +48,7 @@ class ResourceScheduler::Impl {
 
   Status NotifyDownloadDone() {
     {
-      std::unique_lock<std::mutex> lk(concurrent_dl_mutex_);
+      std::lock_guard<std::mutex> lk(concurrent_dl_mutex_);
       if (concurrent_dl_ > 0) {
         --concurrent_dl_;
       }
@@ -67,11 +67,11 @@ class ResourceScheduler::Impl {
 
   Status NotifyProcessingDone() {
     {
-      std::unique_lock<std::mutex> lk(registered_thread_mutex_);
+      std::lock_guard<std::mutex> lk(registered_thread_mutex_);
       registered_threads_.erase(std::this_thread::get_id());
     }
     {
-      std::unique_lock<std::mutex> lk(concurrent_proc_mutex_);
+      std::lock_guard<std::mutex> lk(concurrent_proc_mutex_);
       if (concurrent_proc_ > 0) {
         --concurrent_proc_;
       }

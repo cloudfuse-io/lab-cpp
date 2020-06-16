@@ -6,13 +6,12 @@
 
 #include "arrow/filesystem/filesystem.h"
 #include "arrow/status.h"
-#include "arrow/util/macros.h"
 
 namespace util {
 
 using namespace arrow;
 
-class ARROW_EXPORT ResourceScheduler {
+class ResourceScheduler {
  public:
   // A scheduler that manages queus for download and processing.
   // TODO: handle dequeue and unsubscription on error.

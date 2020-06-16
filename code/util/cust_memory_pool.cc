@@ -35,7 +35,7 @@
 #include "arrow/status.h"
 
 // #define ACTIVATE_RUNWAY_ALLOCATOR
-#define ACTIVATE_POOL_ALLOCATOR
+// #define ACTIVATE_POOL_ALLOCATOR
 // #define ACTIVATE_ALLOCATION_LINKING
 // #define ACTIVATE_ALLOCATION_PRINTING
 
@@ -95,6 +95,7 @@ class linked_set {
  public:
   void add(uint8_t* old_key, uint8_t* new_key, int64_t value) {
 #ifdef ACTIVATE_ALLOCATION_LINKING
+    std::lock_guard<std::mutex> lk(mutex_);
     for (auto& node_vect : vect_vect_) {
       if (node_vect[node_vect.size() - 1].first == old_key) {
         node_vect.push_back({new_key, value});
@@ -160,6 +161,11 @@ class guarded_queue {
 class CustomMemoryPool::CustomMemoryPoolImpl {
  public:
   explicit CustomMemoryPoolImpl(MemoryPool* pool) : pool_(pool) {
+#ifdef ACTIVATE_ALLOCATION_LINKING
+    std::cout << "ACTIVATE_ALLOCATION_LINKING = ON" << std::endl;
+#else
+    std::cout << "ACTIVATE_ALLOCATION_LINKING = OFF" << std::endl;
+#endif
 #ifdef ACTIVATE_RUNWAY_ALLOCATOR
     std::cout << "ACTIVATE_RUNWAY_ALLOCATOR = ON" << std::endl;
 #else

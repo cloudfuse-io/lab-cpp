@@ -92,7 +92,17 @@ std::shared_ptr<arrow::Table> read_single_column_parallel(
   // merge rowgroups back into a table
   auto chuncked_column = std::make_shared<arrow::ChunkedArray>(array_vect);
   auto table = arrow::Table::Make(schema, {chuncked_column});
-  // compute sum with kernel
+
+  // compute avg length manually
+  auto values = std::static_pointer_cast<arrow::StringArray>(table->column(0)->chunk(0));
+  std::cout << "values->length():" << values->length() << std::endl;
+  size_t total_size = 0;
+  for (int i = 0; i < values->length(); i++) {
+    total_size += values->GetView(0).length();
+  }
+  std::cout << "avg size:" << total_size / values->length() << std::endl;
+
+  //// compute sum with kernel
   // auto function_context = arrow::compute::FunctionContext();
   // auto column_datum = arrow::compute::Datum(table->GetColumnByName("cpm"));
   // arrow::compute::Datum result_datum;
@@ -164,7 +174,7 @@ static aws::lambda_runtime::invocation_response my_handler(
     std::cout << "mem_pool->copied_bytes():" << mem_pool->copied_bytes() << std::endl;
   }
 
-  fs->GetMetrics()->Print();
+  // fs->GetMetrics()->Print();
 
   return aws::lambda_runtime::invocation_response::success("Yessss!", "text/plain");
 }

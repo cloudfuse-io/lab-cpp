@@ -23,6 +23,11 @@
 #include "arrow/result.h"
 #include "arrow/status.h"
 
+// #define ACTIVATE_RUNWAY_ALLOCATOR
+// #define ACTIVATE_POOL_ALLOCATOR
+// #define ACTIVATE_ALLOCATION_LINKING
+// #define ACTIVATE_ALLOCATION_PRINTING
+
 namespace arrow {
 
 inline constexpr int64_t HUGE_ALLOC_THRESHOLD_BYTES = 1024 * 1024;

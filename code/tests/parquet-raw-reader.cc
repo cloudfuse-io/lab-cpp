@@ -72,11 +72,12 @@ void read_single_column_parallel(std::unique_ptr<parquet::ParquetFileReader> rea
       while (typed_reader->HasNext()) {
         int64_t values_read = 0;
         typed_reader->ReadBatch(batch_size, nullptr, nullptr, values, &values_read);
-        count_stat.Add(values);
+        count_stat.Add(values, values_read);
         total_values_read += values_read;
       }
       fs->GetResourceScheduler()->NotifyProcessingDone();
       fs->GetMetrics()->NewEvent("read_end");
+      count_stat.Print();
       return total_values_read;
     });
     rg_futures.push_back(std::move(fut));

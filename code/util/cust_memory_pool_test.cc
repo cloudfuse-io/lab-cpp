@@ -27,6 +27,7 @@
 
 namespace arrow {
 
+#ifdef ACTIVATE_RUNWAY_ALLOCATOR
 TEST(CustomMemoryPool, Custom) {
   auto pool = MemoryPool::CreateDefault();
   CustomMemoryPool pp(pool.get());
@@ -80,5 +81,6 @@ TEST(CustomMemoryPool, Custom) {
 
   ASSERT_EQ(0, pp.bytes_allocated());
 }
+#endif
 
 }  // namespace arrow

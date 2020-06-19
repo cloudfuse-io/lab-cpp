@@ -17,17 +17,26 @@
 
 #include "stats.h"
 
+#include <iostream>
+
 namespace util {
 using namespace arrow;
 
 template <typename T>
-CountStat<T>::CountStat() {}
+CountStat<T>::CountStat() : counts_(1000) {}
 
 template <typename T>
-void CountStat<T>::Print() const {}
+void CountStat<T>::Print() const {
+  std::cout << "CountStat.size()=" << counts_.size() << std::endl;
+  std::cout << "CountStat.bucket_count()=" << counts_.bucket_count() << std::endl;
+}
 
 template <typename T>
-Status CountStat<T>::Add(T* items) {
+Status CountStat<T>::Add(T* items, int64_t len) {
+  auto end = items + len;
+  for (T* item = items; item != end; ++item) {
+    counts_[*item]++;
+  }
   return Status::OK();
 }
 

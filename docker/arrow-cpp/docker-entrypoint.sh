@@ -4,6 +4,12 @@ set -e
  # These grow the executable size (5MB -> 30MB) but don't seem to impact perf
  # -ldl flag necessary for stacktrace
  # -g retain source level info
+BUILD_TESTS=OFF
+if [ "$2" = 'test' ]; then
+ BUILD_TESTS=ON
+fi
+
+BUILD_TESTS=${BUILD_TESTS:-OFF}
 
 if [ "$1" = 'build' ]; then
     mkdir -p /source/cpp/build
@@ -11,7 +17,7 @@ if [ "$1" = 'build' ]; then
     cmake .. -DCMAKE_BUILD_TYPE=Release \
       -DARROW_CXXFLAGS="-ldl -g" \
       -DARROW_BUILD_SHARED=OFF \
-      -DARROW_BUILD_TESTS=OFF \
+      -DARROW_BUILD_TESTS=${BUILD_TESTS} \
       -DARROW_JEMALLOC=ON \
       -DARROW_PARQUET=ON \
       -DARROW_S3=ON \

@@ -45,7 +45,7 @@ build: arrow-cpp-build-image
 
 test: arrow-cpp-build-image
 	docker run --rm \
-		-v ${CURDIR}/bin/build-amznlinux1:/source/cpp/build \
+		-v ${CURDIR}/bin/build-tests:/source/cpp/build \
 		-e BUILD_FILE=${BUILD_FILE} \
 		-e BUILD_TYPE=static \
 		buzz-arrow-cpp-build \
@@ -121,13 +121,13 @@ run-local-raw-alloc:
 ## deployment commants
 
 force-deploy-dev:
-	BUILD_FILE=query-bandwidth make build
-	BUILD_FILE=parquet-arrow-reader make build
+	# BUILD_FILE=query-bandwidth make build
+	# BUILD_FILE=parquet-arrow-reader make build
 	BUILD_FILE=parquet-raw-reader make build
-	BUILD_FILE=mem-alloc-overprov make build
-	BUILD_FILE=mem-alloc-speed make build
-	BUILD_FILE=simd-support make build
-	BUILD_FILE=raw-alloc make build
+	# BUILD_FILE=mem-alloc-overprov make build
+	# BUILD_FILE=mem-alloc-speed make build
+	# BUILD_FILE=simd-support make build
+	# BUILD_FILE=raw-alloc make build
 	@echo "DEPLOYING ${GIT_REVISION} to dev ..."
 	@cd infra; terraform workspace select dev
 	@cd infra; terraform apply --var profile=bbdev --var git_revision=${GIT_REVISION}

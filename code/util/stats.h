@@ -42,25 +42,20 @@ struct HashingTraits<parquet::ByteArray> {
       return std::hash<std::string_view>{}(std::string_view(ptr_reinterp, s.len));
     }
   };
-  using Equal = struct {
-    constexpr bool operator()(const Key& lhs, const Key& rhs) const {
-      return lhs.len == rhs.len && memcmp(lhs.ptr, rhs.ptr, lhs.len);
-    }
-  };
+  using Equal = std::equal_to<Key>;
 };
 
-template <typename T>
+template <typename Key>
 class CountStat {
  public:
-  using key_type = T;
-  using Hash = typename HashingTraits<key_type>::Hash;
-  using Equal = typename HashingTraits<key_type>::Equal;
+  using Hash = typename HashingTraits<Key>::Hash;
+  using Equal = typename HashingTraits<Key>::Equal;
 
   CountStat();
   void Print() const;
-  Status Add(key_type* items);
+  Status Add(Key* items, int64_t len);
 
  private:
-  std::unordered_map<key_type, int64_t, Hash, Equal> counts_;
+  std::unordered_map<Key, int64_t, Hash, Equal> counts_;
 };
 }  // namespace util

@@ -34,11 +34,6 @@
 #include "arrow/result.h"
 #include "arrow/status.h"
 
-// #define ACTIVATE_RUNWAY_ALLOCATOR
-// #define ACTIVATE_POOL_ALLOCATOR
-// #define ACTIVATE_ALLOCATION_LINKING
-// #define ACTIVATE_ALLOCATION_PRINTING
-
 static constexpr int64_t PREALLOC_SIZE_BYTES = 1024 * 1024;
 static constexpr int64_t PREALLOC_COUNT = 1500;
 

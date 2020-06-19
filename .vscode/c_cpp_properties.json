@@ -7,7 +7,14 @@
             "cStandard": "c11",
             "cppStandard": "c++17",
             "intelliSenseMode": "clang-x64",
-            "configurationProvider": "vector-of-bool.cmake-tools"
+            "configurationProvider": "vector-of-bool.cmake-tools",
+            "includePath": [
+                "${workspaceFolder}/code/**",
+                "${workspaceFolder}/docker/arrow-cpp/arrow/cpp/**",
+                "${workspaceFolder}/bin/build-amznlinux1/**",
+                "${workspaceFolder}/bin/build-tests/googletest_ep-prefix/include/**",
+                "~/install/include"
+            ]
         }
     ],
     "version": 4

@@ -20,8 +20,10 @@ function(ADD_BUZZ_TEST_CASE TEST_FILE)
           "${EXECUTABLE_OUTPUT_PATH}/${TEST_NAME}")
 endfunction()
 
-add_buzz_test_case(cust_memory_pool_test)
-add_buzz_test_case(stats_test)
+if("${ARROW_BUILD_TESTS}" STREQUAL "ON")
+  add_buzz_test_case(cust_memory_pool_test)
+  add_buzz_test_case(stats_test)
+endif()
 
 
 # this is required to propagate the added targets to the parent scope

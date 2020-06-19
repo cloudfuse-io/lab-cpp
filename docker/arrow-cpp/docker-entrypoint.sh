@@ -1,7 +1,9 @@
 #!/bin/bash
 set -e
 
+ # These grow the executable size (5MB -> 30MB) but don't seem to impact perf
  # -ldl flag necessary for stacktrace
+ # -g retain source level info
 
 if [ "$1" = 'build' ]; then
     mkdir -p /source/cpp/build
@@ -28,4 +30,7 @@ if [ "$2" = 'package' ]; then
 elif [ "$2" = 'test' ]; then
  cd /source/cpp/build/buzz
  /opt/cmake-3.17.1-Linux-x86_64/bin/ctest --verbose
+elif [ "$2" = 'run' ]; then
+ cd /source/cpp/build/release
+ IS_LOCAL=true ./buzz-${BUILD_FILE}-${BUILD_TYPE}
 fi

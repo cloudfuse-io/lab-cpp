@@ -8,7 +8,6 @@ ARG BUILD_TYPE=static
 COPY buzz-${BUILD_FILE}-${BUILD_TYPE}.zip .
 # COPY buzz-test1-shared.zip .
 
-ENV LD_LIBRARY_PATH lib
 ENV AWS_REGION eu-west-1
 ENV IS_LOCAL true
 

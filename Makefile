@@ -51,64 +51,79 @@ test: arrow-cpp-build-image
 		buzz-arrow-cpp-build \
 		build test
 
-## deployment commands
+## local run commands
+
+# possible values: emulator|builder
+RUNTIME ?= emulator
 
 compose-clean-run:
-	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.yaml build
-	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.yaml up --abort-on-container-exit
-	docker logs amznlinux1-run-cpp_lambda-emulator_1
-	# docker cp amznlinux1-run-cpp_lambda-emulator_1:/massif.out.1 massif.out.1
-	docker-compose -f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.yaml rm -fsv
+	@docker-compose \
+		-f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.yaml \
+		-f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.${RUNTIME}.yaml \
+		build --parallel
+	docker-compose \
+		-f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.yaml \
+		-f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.${RUNTIME}.yaml \
+		up --abort-on-container-exit
+	docker logs amznlinux1-run-cpp_lambda-runtime_1
+	@docker-compose \
+		-f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.yaml \
+		-f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.${RUNTIME}.yaml \
+		rm -fsv
 
 # VALGRIND_CMD="valgrind --leak-check=yes"
 # VALGRIND_CMD="valgrind --pages-as-heap=yes --tool=massif"
+# docker cp amznlinux1-run-cpp_lambda-emulator_1:/massif.out.1 massif.out.1
+
+run-local: 
+	BUILD_FILE=${BUILD_FILE} make build
+	CURDIR=${CURDIR} \
+	VALGRIND_CMD="" \
+	COMPOSE_TYPE=${COMPOSE_TYPE} \
+	BUILD_FILE=${BUILD_FILE} \
+	make compose-clean-run
 
 run-local-query-bandwidth: 
-	BUILD_FILE=query-bandwidth make build
-	VALGRIND_CMD="" \
 	COMPOSE_TYPE=minio \
 	BUILD_FILE=query-bandwidth \
-	make compose-clean-run
+	make run-local
 
-run-local-parquet-reader:
-	BUILD_FILE=parquet-reader make build
-	VALGRIND_CMD="" \
+run-local-parquet-arrow-reader:
 	COMPOSE_TYPE=minio \
-	BUILD_FILE=parquet-reader \
-	make compose-clean-run
+	BUILD_FILE=parquet-arrow-reader \
+	make run-local
+
+run-local-parquet-raw-reader:
+	COMPOSE_TYPE=minio \
+	BUILD_FILE=parquet-raw-reader \
+	make run-local
 
 run-local-mem-alloc-overprov:
-	BUILD_FILE=mem-alloc-overprov make build
-	VALGRIND_CMD="" \
 	COMPOSE_TYPE=standalone \
 	BUILD_FILE=mem-alloc-overprov \
-	make compose-clean-run
+	make run-local
 
 run-local-mem-alloc-speed:
-	BUILD_FILE=mem-alloc-speed make build
-	VALGRIND_CMD="" \
 	COMPOSE_TYPE=standalone \
 	BUILD_FILE=mem-alloc-speed \
-	make compose-clean-run
+	make run-local
 
 run-local-simd-support:
-	BUILD_FILE=simd-support make build
-	VALGRIND_CMD="" \
 	COMPOSE_TYPE=standalone \
 	BUILD_FILE=simd-support \
-	make compose-clean-run
+	make run-local
 
 run-local-raw-alloc:
-	BUILD_FILE=raw-alloc make build
-	VALGRIND_CMD="" \
 	COMPOSE_TYPE=standalone \
 	BUILD_FILE=raw-alloc \
-	make compose-clean-run
+	make run-local
 
-# temp command:
+## deployment commants
+
 force-deploy-dev:
 	# BUILD_FILE=query-bandwidth make build
-	BUILD_FILE=parquet-reader make build
+	# BUILD_FILE=parquet-arrow-reader make build
+	BUILD_FILE=parquet-raw-reader make build
 	# BUILD_FILE=mem-alloc-overprov make build
 	# BUILD_FILE=mem-alloc-speed make build
 	# BUILD_FILE=simd-support make build

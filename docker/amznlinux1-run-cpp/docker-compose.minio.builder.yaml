@@ -1,0 +1,11 @@
+version: '2.4'
+
+services:
+  lambda-runtime:
+    build:
+      context: ../../bin/build-amznlinux1/release
+      dockerfile: ../../../docker/amznlinux1-run-cpp/runtime-builder.Dockerfile
+    volumes:
+      - ${CURDIR}/bin/build-amznlinux1/release:/release
+    environment:
+      BUILD_FILE: ${BUILD_FILE}

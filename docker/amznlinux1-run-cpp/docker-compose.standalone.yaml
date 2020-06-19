@@ -1,13 +1,8 @@
 version: '2.4'
 
 services:
-  lambda-emulator:
-    image: buzz-amznlinux1-run-cpp
-    build:
-      context: ../../bin/build-amznlinux1/buzz
-      dockerfile: ../../../docker/amznlinux1-run-cpp/runtime.Dockerfile
-      args:
-        BUILD_FILE: ${BUILD_FILE}
+  lambda-runtime:
+    image: buzz-lambda-runtime-cpp
     volumes:
       - ~/.aws:/root/.aws
     cpus: 1

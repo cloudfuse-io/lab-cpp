@@ -2,11 +2,11 @@ module "env" {
   source = "./env"
 }
 
-module "parquet-reader-static" {
+module "parquet-arrow-reader-static" {
   source = "./lambda"
 
-  function_name = "parquet-reader-static"
-  filename      = "../bin/build-amznlinux1/buzz/buzz-parquet-reader-static.zip"
+  function_name = "parquet-arrow-reader-static"
+  filename      = "../bin/build-amznlinux1/buzz/buzz-parquet-arrow-reader-static.zip"
   handler       = "N/A"
   memory_size   = 2048
   timeout       = 10
@@ -18,6 +18,24 @@ module "parquet-reader-static" {
     MAX_CONCURRENT_PROC : 1
     COLUMN_ID : 16
     AS_DICT : "true"
+  }
+}
+
+module "parquet-raw-reader-static" {
+  source = "./lambda"
+
+  function_name = "parquet-raw-reader-static"
+  filename      = "../bin/build-amznlinux1/buzz/buzz-parquet-raw-reader-static.zip"
+  handler       = "N/A"
+  memory_size   = 2048
+  timeout       = 10
+  runtime       = "provided"
+
+  additional_policies = [aws_iam_policy.scanner-additional-policy.arn]
+  environment = {
+    MAX_CONCURRENT_DL : 8
+    MAX_CONCURRENT_PROC : 1
+    COLUMN_ID : 16
   }
 }
 

@@ -22,13 +22,15 @@
 namespace util {
 using namespace arrow;
 
+constexpr int MAP_SIZE = 1024 * 16;
+
 template <typename T>
-CountStat<T>::CountStat() : counts_(1000) {}
+CountStat<T>::CountStat() : counts_(MAP_SIZE) {}
 
 template <typename T>
 void CountStat<T>::Print() const {
   std::cout << "CountStat.size()=" << counts_.size() << std::endl;
-  std::cout << "CountStat.bucket_count()=" << counts_.bucket_count() << std::endl;
+  std::cout << "CountStat.load_factor()=" << counts_.load_factor() << std::endl;
 }
 
 template <typename T>

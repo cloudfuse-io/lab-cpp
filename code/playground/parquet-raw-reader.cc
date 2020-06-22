@@ -67,12 +67,15 @@ void read_single_column_parallel(std::unique_ptr<parquet::ParquetFileReader> rea
       constexpr int batch_size = 1024 * 2;
       int64_t total_values_read = 0;
       // this should be aligned
-      parquet::ByteArray values[batch_size];
+      uint8_t* values;
+      mem_pool->Allocate(batch_size * sizeof(parquet::ByteArray), &values);
+      auto values_casted = reinterpret_cast<parquet::ByteArray*>(values);
       util::CountStat<parquet::ByteArray> count_stat;
       while (typed_reader->HasNext()) {
         int64_t values_read = 0;
-        typed_reader->ReadBatch(batch_size, nullptr, nullptr, values, &values_read);
-        count_stat.Add(values, values_read);
+        typed_reader->ReadBatch(batch_size, nullptr, nullptr, values_casted,
+                                &values_read);
+        count_stat.Add(values_casted, values_read);
         total_values_read += values_read;
       }
       fs->GetResourceScheduler()->NotifyProcessingDone();

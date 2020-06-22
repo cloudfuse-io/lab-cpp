@@ -12,7 +12,7 @@ if(BUZZ_BUILD_FILE)
 
   MESSAGE(STATUS "Packaging ${BUZZ_BUILD_FILE}.cc as ${BUZZ_TARGET}")
 
-  add_executable(${BUZZ_TARGET} tests/${BUZZ_BUILD_FILE}.cc)
+  add_executable(${BUZZ_TARGET} playground/${BUZZ_BUILD_FILE}.cc)
   list(APPEND BUZZ_ALL ${BUZZ_TARGET})
 
   target_link_libraries(${BUZZ_TARGET}

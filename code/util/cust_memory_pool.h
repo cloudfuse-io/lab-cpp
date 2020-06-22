@@ -17,11 +17,11 @@
 
 #pragma once
 
-#include <string>
+#include <arrow/api.h>
+#include <arrow/result.h>
+#include <arrow/status.h>
 
-#include "arrow/memory_pool.h"
-#include "arrow/result.h"
-#include "arrow/status.h"
+#include <string>
 
 // #define ACTIVATE_RUNWAY_ALLOCATOR
 // #define ACTIVATE_POOL_ALLOCATOR

@@ -17,13 +17,12 @@
 
 #include "cust_memory_pool.h"
 
+#include <arrow/memory_pool.h>
+#include <arrow/status.h>
+#include <arrow/testing/gtest_util.h>
 #include <gtest/gtest.h>
 
 #include <cstdint>
-
-#include "arrow/memory_pool.h"
-#include "arrow/status.h"
-#include "arrow/testing/gtest_util.h"
 
 namespace arrow {
 

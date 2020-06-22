@@ -17,12 +17,11 @@
 
 #pragma once
 
+#include <arrow/status.h>
 #include <parquet/api/schema.h>
 
 #include <string_view>
 #include <unordered_map>
-
-#include "arrow/status.h"
 
 namespace util {
 using namespace arrow;

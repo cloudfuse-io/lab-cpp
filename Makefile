@@ -37,7 +37,15 @@ arrow-cpp-bench-image: bin-folder
 
 build: arrow-cpp-build-image
 	docker run --rm \
-		-v ${CURDIR}/bin/build-amznlinux1:/source/cpp/build \
+		-v ${CURDIR}/bin/build-amznlinux1:/build \
+		-e BUILD_FILE=${BUILD_FILE} \
+		-e BUILD_TYPE=static \
+		buzz-arrow-cpp-build \
+		build
+
+package: arrow-cpp-build-image
+	docker run --rm \
+		-v ${CURDIR}/bin/build-amznlinux1:/build \
 		-e BUILD_FILE=${BUILD_FILE} \
 		-e BUILD_TYPE=static \
 		buzz-arrow-cpp-build \
@@ -45,7 +53,7 @@ build: arrow-cpp-build-image
 
 test: arrow-cpp-build-image
 	docker run --rm \
-		-v ${CURDIR}/bin/build-tests:/source/cpp/build \
+		-v ${CURDIR}/bin/build-tests:/build \
 		-e BUILD_FILE=${BUILD_FILE} \
 		-e BUILD_TYPE=static \
 		buzz-arrow-cpp-build \
@@ -53,30 +61,36 @@ test: arrow-cpp-build-image
 
 ## local run commands
 
-# possible values: emulator|builder
-RUNTIME ?= emulator
+# possible values: 
+# - emulator: run zipped package in a clean amazonlinux1 env
+# - builder: run compiled exec directly in builder
+RUNTIME ?= builder
 
 compose-clean-run:
 	@docker-compose \
 		-f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.yaml \
-		-f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.${RUNTIME}.yaml \
+		-f docker/amznlinux1-run-cpp/docker-compose.${RUNTIME}.yaml \
 		build --parallel
 	docker-compose \
 		-f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.yaml \
-		-f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.${RUNTIME}.yaml \
+		-f docker/amznlinux1-run-cpp/docker-compose.${RUNTIME}.yaml \
 		up --abort-on-container-exit
 	docker logs amznlinux1-run-cpp_lambda-runtime_1
 	@docker-compose \
 		-f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.yaml \
-		-f docker/amznlinux1-run-cpp/docker-compose.${COMPOSE_TYPE}.${RUNTIME}.yaml \
+		-f docker/amznlinux1-run-cpp/docker-compose.${RUNTIME}.yaml \
 		rm -fsv
 
 # VALGRIND_CMD="valgrind --leak-check=yes"
 # VALGRIND_CMD="valgrind --pages-as-heap=yes --tool=massif"
 # docker cp amznlinux1-run-cpp_lambda-emulator_1:/massif.out.1 massif.out.1
 
-run-local: 
+run-local:
+ifeq ($(RUNTIME),emulator)
+	BUILD_FILE=${BUILD_FILE} make package
+else
 	BUILD_FILE=${BUILD_FILE} make build
+endif
 	CURDIR=${CURDIR} \
 	VALGRIND_CMD="" \
 	COMPOSE_TYPE=${COMPOSE_TYPE} \
@@ -121,13 +135,13 @@ run-local-raw-alloc:
 ## deployment commants
 
 force-deploy-dev:
-	# BUILD_FILE=query-bandwidth make build
-	# BUILD_FILE=parquet-arrow-reader make build
-	BUILD_FILE=parquet-raw-reader make build
-	# BUILD_FILE=mem-alloc-overprov make build
-	# BUILD_FILE=mem-alloc-speed make build
-	# BUILD_FILE=simd-support make build
-	# BUILD_FILE=raw-alloc make build
+	BUILD_FILE=query-bandwidth make package
+	BUILD_FILE=parquet-arrow-reader make package
+	BUILD_FILE=parquet-raw-reader make package
+	BUILD_FILE=mem-alloc-overprov make package
+	BUILD_FILE=mem-alloc-speed make package
+	BUILD_FILE=simd-support make package
+	BUILD_FILE=raw-alloc make package
 	@echo "DEPLOYING ${GIT_REVISION} to dev ..."
 	@cd infra; terraform workspace select dev
 	@cd infra; terraform apply --var profile=bbdev --var git_revision=${GIT_REVISION}

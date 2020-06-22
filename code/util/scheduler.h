@@ -1,11 +1,11 @@
 #pragma once
 
+#include <arrow/filesystem/filesystem.h>
+#include <arrow/status.h>
+
 #include <condition_variable>
 #include <thread>
 #include <unordered_set>
-
-#include "arrow/filesystem/filesystem.h"
-#include "arrow/status.h"
 
 namespace util {
 

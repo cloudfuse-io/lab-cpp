@@ -1,0 +1,8 @@
+version: '2.4'
+
+services:
+  lambda-runtime:
+    image: buzz-arrow-cpp-build
+    volumes:
+      - ${CURDIR}/bin/build-amznlinux1:/build
+    entrypoint: /build/buzz-${BUILD_FILE}-static

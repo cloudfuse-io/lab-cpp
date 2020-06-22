@@ -17,12 +17,12 @@
 
 #pragma once
 
+#include <arrow/status.h>
+
 #include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
-
-#include "arrow/status.h"
 
 namespace util {
 

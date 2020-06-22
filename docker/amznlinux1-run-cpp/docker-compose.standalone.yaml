@@ -9,4 +9,5 @@ services:
     mem_limit: 2048M
     environment:
       VALGRIND_CMD: ${VALGRIND_CMD}
+      IS_LOCAL: "true"
 

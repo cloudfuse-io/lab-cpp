@@ -17,15 +17,16 @@
 
 #pragma once
 
+#include <arrow/api.h>
+#include <arrow/util/macros.h>
+#include <arrow/util/uri.h>
+
 #include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
 
-#include "arrow/filesystem/filesystem.h"
-#include "arrow/util/macros.h"
-#include "arrow/util/uri.h"
 #include "metrics.h"
 #include "scheduler.h"
 

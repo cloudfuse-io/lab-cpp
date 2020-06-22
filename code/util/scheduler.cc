@@ -1,9 +1,10 @@
 #include "scheduler.h"
 
+#include <arrow/result.h>
+#include <arrow/status.h>
+
 #include <unordered_map>
 
-#include "arrow/result.h"
-#include "arrow/status.h"
 #include "toolbox.h"
 
 namespace util {

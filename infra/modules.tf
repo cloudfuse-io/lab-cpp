@@ -6,7 +6,7 @@ module "parquet-arrow-reader-static" {
   source = "./lambda"
 
   function_name = "parquet-arrow-reader-static"
-  filename      = "../bin/build-amznlinux1/buzz/buzz-parquet-arrow-reader-static.zip"
+  filename      = "../bin/build-amznlinux1/buzz-parquet-arrow-reader-static.zip"
   handler       = "N/A"
   memory_size   = 2048
   timeout       = 10
@@ -25,7 +25,7 @@ module "parquet-raw-reader-static" {
   source = "./lambda"
 
   function_name = "parquet-raw-reader-static"
-  filename      = "../bin/build-amznlinux1/buzz/buzz-parquet-raw-reader-static.zip"
+  filename      = "../bin/build-amznlinux1/buzz-parquet-raw-reader-static.zip"
   handler       = "N/A"
   memory_size   = 2048
   timeout       = 10
@@ -43,7 +43,7 @@ module "query-bandwidth-static" {
   source = "./lambda"
 
   function_name = "query-bandwidth-static"
-  filename      = "../bin/build-amznlinux1/buzz/buzz-query-bandwidth-static.zip"
+  filename      = "../bin/build-amznlinux1/buzz-query-bandwidth-static.zip"
   handler       = "N/A"
   memory_size   = 2048
   timeout       = 10
@@ -59,7 +59,7 @@ module "mem-alloc-overprov-static" {
   source = "./lambda"
 
   function_name = "mem-alloc-overprov-static"
-  filename      = "../bin/build-amznlinux1/buzz/buzz-mem-alloc-overprov-static.zip"
+  filename      = "../bin/build-amznlinux1/buzz-mem-alloc-overprov-static.zip"
   handler       = "N/A"
   memory_size   = 2048
   timeout       = 10
@@ -77,7 +77,7 @@ module "mem-alloc-speed-static" {
   source = "./lambda"
 
   function_name = "mem-alloc-speed-static"
-  filename      = "../bin/build-amznlinux1/buzz/buzz-mem-alloc-speed-static.zip"
+  filename      = "../bin/build-amznlinux1/buzz-mem-alloc-speed-static.zip"
   handler       = "N/A"
   memory_size   = 2048
   timeout       = 10
@@ -94,7 +94,7 @@ module "simd-support-static" {
   source = "./lambda"
 
   function_name = "simd-support-static"
-  filename      = "../bin/build-amznlinux1/buzz/buzz-simd-support-static.zip"
+  filename      = "../bin/build-amznlinux1/buzz-simd-support-static.zip"
   handler       = "N/A"
   memory_size   = 128
   timeout       = 10
@@ -110,7 +110,7 @@ module "raw-alloc-static" {
   source = "./lambda"
 
   function_name = "raw-alloc-static"
-  filename      = "../bin/build-amznlinux1/buzz/buzz-raw-alloc-static.zip"
+  filename      = "../bin/build-amznlinux1/buzz-raw-alloc-static.zip"
   handler       = "N/A"
   memory_size   = 2048
   timeout       = 10

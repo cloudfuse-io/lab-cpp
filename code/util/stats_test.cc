@@ -17,12 +17,11 @@
 
 #include "stats.h"
 
+#include <arrow/status.h>
+#include <arrow/testing/gtest_util.h>
 #include <gtest/gtest.h>
 
 #include <cstdint>
-
-#include "arrow/status.h"
-#include "arrow/testing/gtest_util.h"
 
 namespace util {
 

@@ -1,5 +1,6 @@
 add_library (buzz-util STATIC cust_memory_pool.cc metrics.cc scheduler.cc stats.cc)
 target_include_directories(buzz-util PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_arrow(buzz-util)
 list(APPEND BUZZ_ALL buzz-util)
 
 # tests
@@ -20,7 +21,7 @@ function(ADD_BUZZ_TEST_CASE TEST_FILE)
           "${EXECUTABLE_OUTPUT_PATH}/${TEST_NAME}")
 endfunction()
 
-if("${ARROW_BUILD_TESTS}" STREQUAL "ON")
+if("${BUZZ_BUILD_TESTS}" STREQUAL "ON")
   add_buzz_test_case(cust_memory_pool_test)
   add_buzz_test_case(stats_test)
 endif()

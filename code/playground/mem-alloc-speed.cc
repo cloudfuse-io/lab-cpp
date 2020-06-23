@@ -11,6 +11,7 @@
 #include <iostream>
 #include <unordered_set>
 
+#include "bootstrap.h"
 #include "toolbox.h"
 
 constexpr int64_t PAGE_SIZE = 4 * 1024;
@@ -58,16 +59,4 @@ static aws::lambda_runtime::invocation_response my_handler(
   return aws::lambda_runtime::invocation_response::success("Yessss!", "text/plain");
 }
 
-int main() {
-  auto handler_lambda = [](aws::lambda_runtime::invocation_request const& req) {
-    return my_handler(req);
-  };
-  if (util::getenv_bool("IS_LOCAL", false)) {
-    aws::lambda_runtime::invocation_response response =
-        handler_lambda(aws::lambda_runtime::invocation_request());
-    std::cout << response.get_payload() << std::endl;
-  } else {
-    aws::lambda_runtime::run_handler(handler_lambda);
-  }
-  return 0;
-}
+int main() { return bootstrap(my_handler); }

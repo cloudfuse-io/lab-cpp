@@ -6,7 +6,8 @@
 #include <iostream>
 #include <thread>
 
-#include "toolbox.h"
+#include "bootstrap.h"
+#include "logger.h"
 #ifdef _MSC_VER
 #include <intrin.h>
 #endif
@@ -30,7 +31,7 @@ unsigned long long _xgetbv(unsigned int index) {
 
 #endif
 
-void print_simd_support() {
+void print_simd_support(util::Logger& logger) {
   bool sseSupportted = false;
   bool sse2Supportted = false;
   bool sse3Supportted = false;
@@ -82,38 +83,30 @@ void print_simd_support() {
   }
 
   // ----------------------------------------------------------------------
-  std::cout << "SSE:" << (sseSupportted ? 1 : 0) << std::endl;
-  std::cout << "SSE2:" << (sse2Supportted ? 1 : 0) << std::endl;
-  std::cout << "SSE3:" << (sse3Supportted ? 1 : 0) << std::endl;
-  std::cout << "SSE4.1:" << (sse4_1Supportted ? 1 : 0) << std::endl;
-  std::cout << "SSE4.2:" << (sse4_2Supportted ? 1 : 0) << std::endl;
-  std::cout << "SSE4a:" << (sse4aSupportted ? 1 : 0) << std::endl;
-  std::cout << "SSE5:" << (sse5Supportted ? 1 : 0) << std::endl;
-  std::cout << "AVX:" << (avxSupportted ? 1 : 0) << std::endl;
+  auto entry = logger.NewEntry();
+  entry.StrField("type", "supported_simd_instructrion_sets");
+  entry.IntField("SSE", sseSupportted);
+  entry.IntField("SSE2", sse2Supportted);
+  entry.IntField("SSE3", sse3Supportted);
+  entry.IntField("SSE4.1", sse4_1Supportted);
+  entry.IntField("SSE4.2", sse4_2Supportted);
+  entry.IntField("SSE4a", sse4aSupportted);
+  entry.IntField("SSE5", sse5Supportted);
+  entry.IntField("AVX", avxSupportted);
+  entry.Log();
 }
 
 static aws::lambda_runtime::invocation_response my_handler(
     aws::lambda_runtime::invocation_request const& req) {
-  std::cout << "==> SUPPORTED SIMD INSTRUCTION SETS" << std::endl;
-  print_simd_support();
+  util::Logger logger(true);
+  print_simd_support(logger);
 
-  std::cout << "==> HARDWARE CONCURRENCY" << std::endl;
-  std::cout << "std::thread::hardware_concurrency()="
-            << std::thread::hardware_concurrency() << std::endl;
+  auto entry = logger.NewEntry();
+  entry.StrField("type", "hardware_concurrency");
+  entry.IntField("value", std::thread::hardware_concurrency());
+  entry.Log();
 
   return aws::lambda_runtime::invocation_response::success("Yessss!", "text/plain");
 }
 
-int main() {
-  auto handler_lambda = [](aws::lambda_runtime::invocation_request const& req) {
-    return my_handler(req);
-  };
-  if (util::getenv_bool("IS_LOCAL", false)) {
-    aws::lambda_runtime::invocation_response response =
-        handler_lambda(aws::lambda_runtime::invocation_request());
-    std::cout << response.get_payload() << std::endl;
-  } else {
-    aws::lambda_runtime::run_handler(handler_lambda);
-  }
-  return 0;
-}
+int main() { return bootstrap(my_handler); }

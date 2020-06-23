@@ -25,6 +25,7 @@
 #include <future>
 #include <iostream>
 
+#include "bootstrap.h"
 #include "cust_memory_pool.h"
 #include "s3fs-forked.h"
 #include "scheduler.h"
@@ -184,13 +185,5 @@ int main() {
   arrow::fs::fork::S3GlobalOptions options;
   options.log_level = arrow::fs::fork::S3LogLevel::Warn;
   PARQUET_THROW_NOT_OK(InitializeS3(options));
-  if (util::getenv_bool("IS_LOCAL", false)) {
-    std::cout << "IS_LOCAL=true" << std::endl;
-    aws::lambda_runtime::invocation_response response =
-        my_handler(aws::lambda_runtime::invocation_request());
-    std::cout << response.get_payload() << std::endl;
-  } else {
-    aws::lambda_runtime::run_handler(my_handler);
-  }
-  return 0;
+  return bootstrap(my_handler);
 }

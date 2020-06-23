@@ -9,6 +9,7 @@
 #include <future>
 #include <iostream>
 
+#include "bootstrap.h"
 #include "s3fs-forked.h"
 #include "toolbox.h"
 
@@ -85,15 +86,7 @@ int main() {
   auto metrics = std::make_shared<util::MetricsManager>();
   PARQUET_ASSIGN_OR_THROW(
       fs, arrow::fs::fork::S3FileSystem::Make(options, scheduler, metrics));
-  auto handler_lambda = [fs](aws::lambda_runtime::invocation_request const& req) {
+  return bootstrap([fs](aws::lambda_runtime::invocation_request const& req) {
     return my_handler(fs, req);
-  };
-  if (is_local) {
-    aws::lambda_runtime::invocation_response response =
-        handler_lambda(aws::lambda_runtime::invocation_request());
-    std::cout << response.get_payload() << std::endl;
-  } else {
-    aws::lambda_runtime::run_handler(handler_lambda);
-  }
-  return 0;
+  });
 }

@@ -1,7 +1,21 @@
 project(buzz-cpp)
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.11)
 
-find_package(aws-lambda-runtime)
+if("${BUZZ_BUILD_TESTS}" STREQUAL "ON")
+  include(FetchContent)
+  FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG        release-1.8.0
+  )
+  FetchContent_GetProperties(googletest)
+  if(NOT googletest_POPULATED)
+    FetchContent_Populate(googletest)
+    add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
+  endif()
+  enable_testing()
+  include(GoogleTest)
+endif()
 
 # list all the targets created here to promote them to CXX17
 set(BUZZ_ALL)
@@ -21,6 +35,7 @@ add_subdirectory(filesystem)
 
 # we build exec files 1 by 1, acording to the BUZZ_BUILD_FILE var
 if(BUZZ_BUILD_FILE)
+  find_package(aws-lambda-runtime)
   set(BUZZ_TARGET "buzz-${BUZZ_BUILD_FILE}-${BUZZ_BUILD_TYPE}")
 
   MESSAGE(STATUS "Packaging ${BUZZ_BUILD_FILE}.cc as ${BUZZ_TARGET}")

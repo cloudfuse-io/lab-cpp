@@ -9,8 +9,6 @@ if [ "$2" = 'test' ]; then
  BUILD_TESTS=ON
 fi
 
-BUILD_TESTS=${BUILD_TESTS:-OFF}
-
 if [ "$1" = 'build' ]; then
     mkdir -p /build
     cd /build
@@ -18,9 +16,11 @@ if [ "$1" = 'build' ]; then
       -DARROW_BUILD_STATIC=ON \
       -DARROW_DEPENDENCY_SOURCE=AUTO \
       -DARROW_CXXFLAGS="-ldl -g" \
+      -DARROW_BUILD_TESTS=OFF \
       -DARROW_BUILD_SHARED=OFF \
       -DARROW_JEMALLOC=ON \
       -DARROW_PARQUET=ON \
+      -DARROW_JSON=ON \
       -DARROW_S3=ON \
       -DARROW_FILESYSTEM=ON \
       -DARROW_WITH_ZLIB=ON \

@@ -11,8 +11,8 @@
             "includePath": [
                 "${workspaceFolder}/code/**",
                 "${workspaceFolder}/docker/arrow-cpp/arrow/cpp/**",
-                "${workspaceFolder}/bin/build-amznlinux1/**",
-                "${workspaceFolder}/bin/build-tests/googletest_ep-prefix/include/**",
+                "${workspaceFolder}/bin/build-amznlinux1/arrow/**",
+                "${workspaceFolder}/bin/build-tests/_deps/googletest-src/**",
                 "~/install/include"
             ]
         }

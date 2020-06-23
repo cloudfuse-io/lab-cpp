@@ -3,27 +3,30 @@ target_include_directories(buzz-util PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_arrow(buzz-util)
 list(APPEND BUZZ_ALL buzz-util)
 
-# tests
-set(BUZZ_UTIL_TEST_LINK_LIBS buzz-util 
-                            parquet_${BUZZ_BUILD_TYPE}
-                            ${ARROW_TEST_LINK_LIBS})
+## tests ##
 
-function(ADD_BUZZ_TEST_CASE TEST_FILE)
-  set(TEST_NAME "${TEST_FILE}-target")
-  add_executable(${TEST_NAME} "${TEST_FILE}.cc")
-  target_link_libraries(${TEST_NAME} PRIVATE ${BUZZ_UTIL_TEST_LINK_LIBS})
-  # it is not enough to set CXX version at the end
-  set_property(TARGET ${TEST_NAME} PROPERTY CXX_STANDARD 17)
-  add_test(${TEST_NAME}
-          ${BUILD_SUPPORT_DIR}/run-test.sh
-          ${CMAKE_BINARY_DIR}
-          test
-          "${EXECUTABLE_OUTPUT_PATH}/${TEST_NAME}")
-endfunction()
+macro(package_add_test TESTNAME)
+    # create an exectuable in which the tests will be stored
+    add_executable(${TESTNAME} ${ARGN})
+    # link the Google test infrastructure, mocking library, and a default main fuction to
+    # the test executable.  Remove g_test_main if writing your own main function.
+    target_link_libraries(${TESTNAME} PRIVATE gtest gmock gtest_main)
+    # TODO selectively link arrow
+    target_link_arrow(${TESTNAME})
+    # gtest_discover_tests replaces gtest_add_tests,
+    # see https://cmake.org/cmake/help/v3.10/module/GoogleTest.html for more options to pass to it
+    gtest_discover_tests(${TESTNAME}
+        # set a working directory so your project root so that you can find test data via paths relative to the project root
+        WORKING_DIRECTORY ${PROJECT_DIR}
+        PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${PROJECT_DIR}"
+    )
+    set_target_properties(${TESTNAME} PROPERTIES FOLDER tests)
+    list(APPEND BUZZ_ALL ${TESTNAME})
+endmacro()
 
 if("${BUZZ_BUILD_TESTS}" STREQUAL "ON")
-  add_buzz_test_case(cust_memory_pool_test)
-  add_buzz_test_case(stats_test)
+  package_add_test(cust_memory_pool_test cust_memory_pool_test.cc)
+  package_add_test(stats_test stats_test.cc)
 endif()
 
 

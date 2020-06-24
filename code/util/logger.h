@@ -20,10 +20,12 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <iostream>
 
 namespace util {
 using namespace rapidjson;
+using namespace boost::posix_time;
 
 class LogEntry {
  public:
@@ -60,6 +62,8 @@ Logger::Logger(bool is_local) : is_local_(is_local) {
 LogEntry::LogEntry(const char* msg, bool is_local)
     : buffer_(), writer_(buffer_), is_local_(is_local) {
   writer_.StartObject();
+  writer_.Key("time");
+  writer_.String(to_iso_extended_string(microsec_clock::universal_time()).data());
   writer_.Key("msg");
   writer_.String(msg);
 }

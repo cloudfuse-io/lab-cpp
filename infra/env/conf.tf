@@ -4,7 +4,7 @@ locals {
   envs = {
     dev = {
       tags = {
-        module      = "arrow-cpp"
+        module      = "buzz-cpp"
         provisioner = "terraform"
         stage       = terraform.workspace
       },

@@ -127,12 +127,22 @@ run-local-simd-support:
 	BUILD_FILE=simd-support \
 	make run-local
 
+run-local-mem-bandwidth:
+	COMPOSE_TYPE=standalone \
+	BUILD_FILE=mem-bandwidth \
+	make run-local
+
 run-local-raw-alloc:
 	COMPOSE_TYPE=standalone \
 	BUILD_FILE=raw-alloc \
 	make run-local
 
-## deployment commants
+## deployment commands
+
+force-deploy-dev-one:
+	make package
+	@cd infra; terraform workspace select dev
+	cd infra; terraform apply -target=module.${BUILD_FILE}-lambda --var profile=bbdev --var git_revision=${GIT_REVISION} 
 
 force-deploy-dev:
 	BUILD_FILE=query-bandwidth make package
@@ -141,6 +151,7 @@ force-deploy-dev:
 	BUILD_FILE=mem-alloc-overprov make package
 	BUILD_FILE=mem-alloc-speed make package
 	BUILD_FILE=simd-support make package
+	BUILD_FILE=mem-bandwidth make package
 	BUILD_FILE=raw-alloc make package
 	@echo "DEPLOYING ${GIT_REVISION} to dev ..."
 	@cd infra; terraform workspace select dev

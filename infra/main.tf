@@ -18,3 +18,7 @@ provider "aws" {
   version = "2.45.0"
   region  = module.env.region_name
 }
+
+module "env" {
+  source = "./env"
+}

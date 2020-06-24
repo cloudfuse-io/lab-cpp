@@ -5,7 +5,7 @@ module "env" {
 
 # function related configuration
 
-variable "function_name" {}
+variable "function_base_name" {}
 
 variable "filename" {}
 

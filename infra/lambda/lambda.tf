@@ -1,6 +1,6 @@
 resource "aws_lambda_function" "lambda" {
   filename         = var.filename
-  function_name    = "${module.env.tags["module"]}-${var.function_name}-${module.env.stage}"
+  function_name    = "${module.env.tags["module"]}-${var.function_base_name}-${module.env.stage}"
   role             = aws_iam_role.lambda_role.arn
   handler          = var.handler
   memory_size      = var.memory_size

@@ -28,7 +28,7 @@ int bootstrap(Func handler) {
   if (util::getenv_bool("IS_LOCAL", false)) {
     aws::lambda_runtime::invocation_response response =
         handler(aws::lambda_runtime::invocation_request());
-    std::cout << response.get_payload() << std::endl;
+    std::cout << "response: " << response.get_payload() << std::endl;
   } else {
     aws::lambda_runtime::run_handler(handler);
   }

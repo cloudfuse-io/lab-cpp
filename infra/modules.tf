@@ -1,18 +1,14 @@
-module "env" {
-  source = "./env"
-}
-
-module "parquet-arrow-reader-static" {
+module "parquet-arrow-reader-lambda" {
   source = "./lambda"
 
-  function_name = "parquet-arrow-reader-static"
+  function_base_name = "parquet-arrow-reader-static"
   filename      = "../bin/build-amznlinux1/buzz-parquet-arrow-reader-static.zip"
   handler       = "N/A"
   memory_size   = 2048
   timeout       = 10
   runtime       = "provided"
 
-  additional_policies = [aws_iam_policy.scanner-additional-policy.arn]
+  additional_policies = [aws_iam_policy.s3-additional-policy.arn]
   environment = {
     MAX_CONCURRENT_DL : 8
     MAX_CONCURRENT_PROC : 1
@@ -21,17 +17,17 @@ module "parquet-arrow-reader-static" {
   }
 }
 
-module "parquet-raw-reader-static" {
+module "parquet-raw-reader-lambda" {
   source = "./lambda"
 
-  function_name = "parquet-raw-reader-static"
+  function_base_name = "parquet-raw-reader-static"
   filename      = "../bin/build-amznlinux1/buzz-parquet-raw-reader-static.zip"
   handler       = "N/A"
   memory_size   = 2048
   timeout       = 10
   runtime       = "provided"
 
-  additional_policies = [aws_iam_policy.scanner-additional-policy.arn]
+  additional_policies = [aws_iam_policy.s3-additional-policy.arn]
   environment = {
     MAX_CONCURRENT_DL : 8
     MAX_CONCURRENT_PROC : 1
@@ -39,33 +35,33 @@ module "parquet-raw-reader-static" {
   }
 }
 
-module "query-bandwidth-static" {
+module "query-bandwidth-lambda" {
   source = "./lambda"
 
-  function_name = "query-bandwidth-static"
+  function_base_name = "query-bandwidth-static"
   filename      = "../bin/build-amznlinux1/buzz-query-bandwidth-static.zip"
   handler       = "N/A"
   memory_size   = 2048
   timeout       = 10
   runtime       = "provided"
 
-  additional_policies = [aws_iam_policy.scanner-additional-policy.arn]
+  additional_policies = [aws_iam_policy.s3-additional-policy.arn]
   environment = {
     MOCK = "mock"
   }
 }
 
-module "mem-alloc-overprov-static" {
+module "mem-alloc-overprov-lambda" {
   source = "./lambda"
 
-  function_name = "mem-alloc-overprov-static"
+  function_base_name = "mem-alloc-overprov-static"
   filename      = "../bin/build-amznlinux1/buzz-mem-alloc-overprov-static.zip"
   handler       = "N/A"
   memory_size   = 2048
   timeout       = 10
   runtime       = "provided"
 
-  additional_policies = [aws_iam_policy.scanner-additional-policy.arn]
+  additional_policies = []
   environment = {
     NB_ALLOCATION : 100
     ALLOCATION_SIZE_BYTE : 1048576
@@ -73,52 +69,78 @@ module "mem-alloc-overprov-static" {
   }
 }
 
-module "mem-alloc-speed-static" {
+module "mem-alloc-speed-lambda" {
   source = "./lambda"
 
-  function_name = "mem-alloc-speed-static"
+  function_base_name = "mem-alloc-speed-static"
   filename      = "../bin/build-amznlinux1/buzz-mem-alloc-speed-static.zip"
   handler       = "N/A"
   memory_size   = 2048
   timeout       = 10
   runtime       = "provided"
 
-  additional_policies = [aws_iam_policy.scanner-additional-policy.arn]
+  additional_policies = []
   environment = {
     NB_ALLOCATION : 100
     ALLOCATION_SIZE_BYTE : 1048576
   }
 }
 
-module "simd-support-static" {
+module "simd-support-lambda" {
   source = "./lambda"
 
-  function_name = "simd-support-static"
+  function_base_name = "simd-support-static"
   filename      = "../bin/build-amznlinux1/buzz-simd-support-static.zip"
   handler       = "N/A"
   memory_size   = 128
   timeout       = 10
   runtime       = "provided"
 
-  additional_policies = [aws_iam_policy.scanner-additional-policy.arn]
+  additional_policies = []
   environment = {
     MOCK = 0
   }
 }
 
-module "raw-alloc-static" {
+module "mem-bandwidth-lambda" {
   source = "./lambda"
 
-  function_name = "raw-alloc-static"
+  function_base_name = "mem-bandwidth-static"
+  filename      = "../bin/build-amznlinux1/buzz-mem-bandwidth-static.zip"
+  handler       = "N/A"
+  memory_size   = 2048
+  timeout       = 10
+  runtime       = "provided"
+
+  additional_policies = []
+  environment = {
+    MOCK = 0
+  }
+}
+
+module "raw-alloc-lambda" {
+  source = "./lambda"
+
+  function_base_name = "raw-alloc-static"
   filename      = "../bin/build-amznlinux1/buzz-raw-alloc-static.zip"
   handler       = "N/A"
   memory_size   = 2048
   timeout       = 10
   runtime       = "provided"
 
-  additional_policies = [aws_iam_policy.scanner-additional-policy.arn]
+  additional_policies = []
   environment = {
     NB_PAGE         = 1024
     ALLOC_TEST_NAME = "mmap_madv_newplace"
   }
+}
+
+########### SCHEDULERS #############
+
+module "mem-bandwidth-scheduler" {
+  source = "./scheduler"
+
+  function_name       = module.mem-bandwidth-lambda.lambda_name
+  function_arn        = module.mem-bandwidth-lambda.lambda_arn
+  schedule_expression = "cron(0 * * * ? *)"
 }

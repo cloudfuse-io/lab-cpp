@@ -57,7 +57,7 @@ static aws::lambda_runtime::invocation_response my_handler(
     std::cout << allocated_pages.size() * PAGE_SIZE / (1024 * 1024) << " ";
   }
   std::cout << std::endl;
-  return aws::lambda_runtime::invocation_response::success("Yessss!", "text/plain");
+  return aws::lambda_runtime::invocation_response::success("Done", "text/plain");
 }
 
 int main() { return bootstrap(my_handler); }

@@ -3,7 +3,6 @@
 #include <string.h>
 
 #include <fstream>
-#include <iostream>
 #include <thread>
 
 #include "bootstrap.h"
@@ -83,8 +82,7 @@ void print_simd_support(util::Logger& logger) {
   }
 
   // ----------------------------------------------------------------------
-  auto entry = logger.NewEntry();
-  entry.StrField("type", "supported_simd_instructrion_sets");
+  auto entry = logger.NewEntry("supp_simd_instr_sets");
   entry.IntField("SSE", sseSupportted);
   entry.IntField("SSE2", sse2Supportted);
   entry.IntField("SSE3", sse3Supportted);
@@ -101,12 +99,13 @@ static aws::lambda_runtime::invocation_response my_handler(
   util::Logger logger(true);
   print_simd_support(logger);
 
-  auto entry = logger.NewEntry();
-  entry.StrField("type", "hardware_concurrency");
-  entry.IntField("value", std::thread::hardware_concurrency());
+  auto entry = logger.NewEntry("cpu_hardware");
+  entry.IntField("nb_cores",
+                 std::thread::hardware_concurrency());  // seems to be always 2
+  entry.IntField("current_core", sched_getcpu());       // should be 0 or 1
   entry.Log();
 
-  return aws::lambda_runtime::invocation_response::success("Yessss!", "text/plain");
+  return aws::lambda_runtime::invocation_response::success("Done", "text/plain");
 }
 
 int main() { return bootstrap(my_handler); }

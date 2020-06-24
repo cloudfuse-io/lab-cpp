@@ -56,7 +56,7 @@ static aws::lambda_runtime::invocation_response my_handler(
       std::cout << new_pages_allocated << std::endl;
     }
   }
-  return aws::lambda_runtime::invocation_response::success("Yessss!", "text/plain");
+  return aws::lambda_runtime::invocation_response::success("Done", "text/plain");
 }
 
 int main() { return bootstrap(my_handler); }

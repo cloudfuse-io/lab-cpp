@@ -31,9 +31,10 @@ class LogEntry {
   void IntField(const char* key, int64_t value);
   void FloatField(const char* key, double value);
   void Log();
-  LogEntry(bool is_local);
+  friend class Logger;
 
  private:
+  LogEntry(const char* msg, bool is_local);
   StringBuffer buffer_;
   Writer<StringBuffer> writer_;
   bool is_local_;
@@ -42,7 +43,9 @@ class LogEntry {
 class Logger {
  public:
   Logger(bool is_local);
-  LogEntry NewEntry() { return LogEntry(is_local_); }
+  LogEntry NewEntry(const char* msg, bool is_local = true) {
+    return LogEntry(msg, is_local_);
+  }
 
  private:
   bool is_local_;
@@ -54,8 +57,11 @@ Logger::Logger(bool is_local) : is_local_(is_local) {
   }
 }
 
-LogEntry::LogEntry(bool is_local) : buffer_(), writer_(buffer_), is_local_(is_local) {
+LogEntry::LogEntry(const char* msg, bool is_local)
+    : buffer_(), writer_(buffer_), is_local_(is_local) {
   writer_.StartObject();
+  writer_.Key("msg");
+  writer_.String(msg);
 }
 
 void LogEntry::StrField(const char* key, const char* value) {

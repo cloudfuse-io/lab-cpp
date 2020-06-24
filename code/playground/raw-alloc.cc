@@ -214,7 +214,7 @@ static aws::lambda_runtime::invocation_response my_handler(
   func_map["mmap_hugepage"] = mmap_hugepage;
   (*(func_map[ALLOC_TEST_NAME]))();
 
-  return aws::lambda_runtime::invocation_response::success("Yessss!", "text/plain");
+  return aws::lambda_runtime::invocation_response::success("Done", "text/plain");
 }
 
 int main() { return bootstrap(my_handler); }

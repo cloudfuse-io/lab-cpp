@@ -17,6 +17,10 @@
 
 #pragma once
 
+#include <aws/lambda-runtime/runtime.h>
+
+#include <iostream>
+
 #include "toolbox.h"
 
 template <typename Func>

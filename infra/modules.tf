@@ -135,6 +135,22 @@ module "raw-alloc-lambda" {
   }
 }
 
+module "core-affinity-lambda" {
+  source = "./lambda"
+
+  function_base_name = "core-affinity-static"
+  filename      = "../bin/build-amznlinux1/buzz-core-affinity-static.zip"
+  handler       = "N/A"
+  memory_size   = 1792
+  timeout       = 10
+  runtime       = "provided"
+
+  additional_policies = []
+  environment = {
+    CPU_FOR_SECOND_THREAD = 1
+  }
+}
+
 ########### SCHEDULERS #############
 
 module "mem-bandwidth-scheduler" {

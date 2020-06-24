@@ -137,7 +137,15 @@ run-local-raw-alloc:
 	BUILD_FILE=raw-alloc \
 	make run-local
 
+run-local-core-affinity:
+	COMPOSE_TYPE=standalone \
+	BUILD_FILE=core-affinity \
+	make run-local
+
 ## deployment commands
+
+init-dev:
+	cd infra; terraform init
 
 force-deploy-dev-one:
 	make package

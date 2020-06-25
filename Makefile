@@ -142,6 +142,13 @@ run-local-core-affinity:
 	BUILD_FILE=core-affinity \
 	make run-local
 
+bash-inside-emulator:
+	BUILD_FILE=${BUILD_FILE} docker-compose \
+		-f docker/amznlinux1-run-cpp/docker-compose.standalone.yaml \
+		-f docker/amznlinux1-run-cpp/docker-compose.emulator.yaml \
+		-f docker/amznlinux1-run-cpp/docker-compose.interactive.yaml \
+		run --rm lambda-runtime 
+
 ## deployment commands
 
 init-dev:

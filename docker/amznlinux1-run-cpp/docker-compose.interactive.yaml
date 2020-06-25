@@ -1,0 +1,7 @@
+version: '2.4'
+
+services:
+  lambda-runtime:
+    entrypoint: /bin/bash
+    stdin_open: true # docker run -i
+    tty: true        # docker run -t

@@ -59,7 +59,7 @@ static aws::lambda_runtime::invocation_response my_handler(
         entry.FloatField("agg_GBpS", ARRAY_BYTES / agg_duration * 1000. * 1000. / GIGA);
         entry.IntField("agg_ms", agg_duration / 1000);
         entry.IntField("computed_sum", sum);
-        entry.FloatField("size_GB", ARRAY_BYTES / GIGA);
+        // entry.FloatField("size_GB", ARRAY_BYTES / GIGA);
         entry.IntField("core", sched_getcpu());
         entry.Log();
       });

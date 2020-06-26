@@ -48,6 +48,8 @@ module "query-bandwidth-lambda" {
   additional_policies = [aws_iam_policy.s3-additional-policy.arn]
   environment = {
     MOCK = "mock"
+    NB_PARALLEL = 12
+    CHUNK_SIZE = 250000
   }
 }
 

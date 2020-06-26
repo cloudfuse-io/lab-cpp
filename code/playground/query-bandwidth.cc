@@ -13,6 +13,9 @@
 #include "s3fs-forked.h"
 #include "toolbox.h"
 
+static int NB_PARALLEL = util::getenv_int("NB_PARALLEL", 12);
+static int64_t CHUNK_SIZE = util::getenv_int("CHUNK_SIZE", 250000);
+
 int64_t download_chunck(std::shared_ptr<arrow::io::RandomAccessFile> infile,
                         int64_t start, int64_t nbbytes) {
   auto start_time = std::chrono::high_resolution_clock::now();
@@ -28,28 +31,29 @@ static aws::lambda_runtime::invocation_response my_handler(
     aws::lambda_runtime::invocation_request const& req) {
   std::vector<std::string> file_names{
       "bb-test-data-dev/bid-large.parquet",
-      "bb-test-data-dev/bid-large-bis.parquet",
+      // "bb-test-data-dev/bid-large-bis.parquet",
   };
 
-  int64_t chunck_size{250000};
   for (auto file_name : file_names) {
-    int nb_parallel{20};
     std::shared_ptr<arrow::io::RandomAccessFile> infile;
+    fs->GetMetrics()->NewEvent("open_input_file");
     PARQUET_ASSIGN_OR_THROW(infile, fs->OpenInputFile(file_name));
+    fs->GetMetrics()->NewEvent("input_file_opened");
     auto start_time = std::chrono::high_resolution_clock::now();
     std::vector<std::future<int64_t>> dl_futures;
-    dl_futures.reserve(nb_parallel);
-    for (int i = 0; i < nb_parallel; i++) {
-      auto fut = std::async(std::launch::async, download_chunck, infile, i * chunck_size,
-                            chunck_size);
+    dl_futures.reserve(NB_PARALLEL);
+    for (int i = 0; i < NB_PARALLEL; i++) {
+      auto fut = std::async(std::launch::async, download_chunck, infile, i * CHUNK_SIZE,
+                            CHUNK_SIZE);
       dl_futures.push_back(std::move(fut));
     }
-    std::cout << "=> parallel:" << nb_parallel << std::endl;
+    fs->GetMetrics()->NewEvent("future_creation_done");
+    std::cout << "=> parallel:" << NB_PARALLEL << std::endl;
     // std::cout << "speed:";
     int64_t added_speed{0};
     for (auto& dl_future : dl_futures) {
       auto local_duration = dl_future.get();
-      auto local_speed = chunck_size / local_duration;  // (to µs / to MB)
+      auto local_speed = CHUNK_SIZE / local_duration;  // (to µs / to MB)
       added_speed += local_speed;
       // std::cout << local_speed << ",";
     }
@@ -57,8 +61,8 @@ static aws::lambda_runtime::invocation_response my_handler(
     // std::cout << "added_speed:" << added_speed << std::endl;
     auto end_time = std::chrono::high_resolution_clock::now();
     auto total_duration = util::get_duration_ms(start_time, end_time);
-    std::cout << "duration_ms:" << total_duration / 1000
-              << "/speed_MBpS:" << chunck_size * nb_parallel / total_duration
+    std::cout << "duration_ms:" << total_duration << "/speed_MBpS:"
+              << CHUNK_SIZE / 1000000. * NB_PARALLEL / (total_duration / 1000.)
               << std::endl;
   }
 

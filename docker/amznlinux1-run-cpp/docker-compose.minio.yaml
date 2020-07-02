@@ -46,7 +46,6 @@ services:
     environment:
       AWS_ACCESS_KEY_ID: minio
       AWS_SECRET_ACCESS_KEY: minio123
-      VALGRIND_CMD: ${VALGRIND_CMD}
       AWS_REGION: eu-west-1
       IS_LOCAL: "true"
     depends_on:

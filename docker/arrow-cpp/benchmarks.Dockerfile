@@ -8,27 +8,27 @@ ENV DEBIAN_FRONTEND=noninteractive
 ARG clang_tools=8
 RUN apt-get update -y -q \
     && apt-get install -y -q \
-        clang-${clang_tools} \
-        clang-format-${clang_tools} \
-        clang-tidy-${clang_tools} \
-        clang-tools-${clang_tools} \
-        libclang-${clang_tools}-dev \
-        llvm-${clang_tools}-dev \
-        autoconf \
-        ca-certificates \
-        ccache \
-        cmake \
-        g++ \
-        gcc \
-        gdb \
-        git \
-        curl \
-        python3 \
-        python3-dev \
-        python3-pip \
+    clang-${clang_tools} \
+    clang-format-${clang_tools} \
+    clang-tidy-${clang_tools} \
+    clang-tools-${clang_tools} \
+    libclang-${clang_tools}-dev \
+    llvm-${clang_tools}-dev \
+    autoconf \
+    ca-certificates \
+    ccache \
+    cmake \
+    g++ \
+    gcc \
+    gdb \
+    git \
+    curl \
+    python3 \
+    python3-dev \
+    python3-pip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-        
+
 
 RUN ln -s /usr/bin/python3 /usr/local/bin/python && \
     ln -s /usr/bin/pip3 /usr/local/bin/pip

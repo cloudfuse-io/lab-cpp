@@ -2,7 +2,9 @@ version: '2.4'
 
 services:
   lambda-runtime:
-    image: buzz-arrow-cpp-build
+    image: buzz-arrow-cpp-build-bee
     volumes:
       - ${CURDIR}/bin/build-amznlinux1:/build
-    entrypoint: /build/buzz-${BUILD_FILE}-static
+    entrypoint: /build/executables/buzz-${BUILD_FILE}-static
+    environment:
+      VALGRIND_CMD: ${VALGRIND_CMD}

@@ -1,0 +1,18 @@
+version: '2.4'
+
+services:
+  server-runtime:
+    build:
+      context: ../../bin/build-ubuntu/executables
+      dockerfile: ../../../docker/ubuntu-run-cpp/Dockerfile
+      args:
+        BUILD_FILE: ${BUILD_FILE}
+    volumes:
+      - ~/.aws:/root/.aws
+    cpus: 4
+    mem_limit: 4096M
+    environment:
+      IS_LOCAL: "true"
+    ports:
+      - "8081:80"
+

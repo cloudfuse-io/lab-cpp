@@ -3,7 +3,7 @@ version: '2.4'
 services:
   lambda-runtime:
     build:
-      context: ../../bin/build-amznlinux1
-      dockerfile: ../../docker/amznlinux1-run-cpp/runtime-emulator.Dockerfile
+      context: ../../bin/build-amznlinux1/executables
+      dockerfile: ../../../docker/amznlinux1-run-cpp/runtime-emulator.Dockerfile
       args:
         BUILD_FILE: ${BUILD_FILE}

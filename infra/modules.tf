@@ -1,12 +1,17 @@
+locals {
+  lambda_build_dir = "../bin/build-amznlinux1/executables"
+}
+
+
 module "parquet-arrow-reader-lambda" {
   source = "./lambda"
 
   function_base_name = "parquet-arrow-reader-static"
-  filename      = "../bin/build-amznlinux1/buzz-parquet-arrow-reader-static.zip"
-  handler       = "N/A"
-  memory_size   = 2048
-  timeout       = 10
-  runtime       = "provided"
+  filename           = "${local.lambda_build_dir}/buzz-parquet-arrow-reader-static.zip"
+  handler            = "N/A"
+  memory_size        = 2048
+  timeout            = 10
+  runtime            = "provided"
 
   additional_policies = [aws_iam_policy.s3-additional-policy.arn]
   environment = {
@@ -21,11 +26,11 @@ module "parquet-raw-reader-lambda" {
   source = "./lambda"
 
   function_base_name = "parquet-raw-reader-static"
-  filename      = "../bin/build-amznlinux1/buzz-parquet-raw-reader-static.zip"
-  handler       = "N/A"
-  memory_size   = 2048
-  timeout       = 10
-  runtime       = "provided"
+  filename           = "${local.lambda_build_dir}/buzz-parquet-raw-reader-static.zip"
+  handler            = "N/A"
+  memory_size        = 2048
+  timeout            = 10
+  runtime            = "provided"
 
   additional_policies = [aws_iam_policy.s3-additional-policy.arn]
   environment = {
@@ -39,17 +44,17 @@ module "query-bandwidth-lambda" {
   source = "./lambda"
 
   function_base_name = "query-bandwidth-static"
-  filename      = "../bin/build-amznlinux1/buzz-query-bandwidth-static.zip"
-  handler       = "N/A"
-  memory_size   = 2048
-  timeout       = 10
-  runtime       = "provided"
+  filename           = "${local.lambda_build_dir}/buzz-query-bandwidth-static.zip"
+  handler            = "N/A"
+  memory_size        = 2048
+  timeout            = 10
+  runtime            = "provided"
 
   additional_policies = [aws_iam_policy.s3-additional-policy.arn]
   environment = {
-    MOCK = "mock"
+    MOCK        = "mock"
     NB_PARALLEL = 12
-    CHUNK_SIZE = 250000
+    CHUNK_SIZE  = 250000
   }
 }
 
@@ -57,11 +62,11 @@ module "mem-alloc-overprov-lambda" {
   source = "./lambda"
 
   function_base_name = "mem-alloc-overprov-static"
-  filename      = "../bin/build-amznlinux1/buzz-mem-alloc-overprov-static.zip"
-  handler       = "N/A"
-  memory_size   = 2048
-  timeout       = 10
-  runtime       = "provided"
+  filename           = "${local.lambda_build_dir}/buzz-mem-alloc-overprov-static.zip"
+  handler            = "N/A"
+  memory_size        = 2048
+  timeout            = 10
+  runtime            = "provided"
 
   additional_policies = []
   environment = {
@@ -75,11 +80,11 @@ module "mem-alloc-speed-lambda" {
   source = "./lambda"
 
   function_base_name = "mem-alloc-speed-static"
-  filename      = "../bin/build-amznlinux1/buzz-mem-alloc-speed-static.zip"
-  handler       = "N/A"
-  memory_size   = 2048
-  timeout       = 10
-  runtime       = "provided"
+  filename           = "${local.lambda_build_dir}/buzz-mem-alloc-speed-static.zip"
+  handler            = "N/A"
+  memory_size        = 2048
+  timeout            = 10
+  runtime            = "provided"
 
   additional_policies = []
   environment = {
@@ -92,11 +97,11 @@ module "simd-support-lambda" {
   source = "./lambda"
 
   function_base_name = "simd-support-static"
-  filename      = "../bin/build-amznlinux1/buzz-simd-support-static.zip"
-  handler       = "N/A"
-  memory_size   = 128
-  timeout       = 10
-  runtime       = "provided"
+  filename           = "${local.lambda_build_dir}/buzz-simd-support-static.zip"
+  handler            = "N/A"
+  memory_size        = 128
+  timeout            = 10
+  runtime            = "provided"
 
   additional_policies = []
   environment = {
@@ -108,11 +113,11 @@ module "mem-bandwidth-lambda" {
   source = "./lambda"
 
   function_base_name = "mem-bandwidth-static"
-  filename      = "../bin/build-amznlinux1/buzz-mem-bandwidth-static.zip"
-  handler       = "N/A"
-  memory_size   = 2048
-  timeout       = 10
-  runtime       = "provided"
+  filename           = "${local.lambda_build_dir}/buzz-mem-bandwidth-static.zip"
+  handler            = "N/A"
+  memory_size        = 2048
+  timeout            = 10
+  runtime            = "provided"
 
   additional_policies = []
   environment = {
@@ -124,11 +129,11 @@ module "raw-alloc-lambda" {
   source = "./lambda"
 
   function_base_name = "raw-alloc-static"
-  filename      = "../bin/build-amznlinux1/buzz-raw-alloc-static.zip"
-  handler       = "N/A"
-  memory_size   = 2048
-  timeout       = 10
-  runtime       = "provided"
+  filename           = "${local.lambda_build_dir}/buzz-raw-alloc-static.zip"
+  handler            = "N/A"
+  memory_size        = 2048
+  timeout            = 10
+  runtime            = "provided"
 
   additional_policies = []
   environment = {
@@ -141,11 +146,11 @@ module "core-affinity-lambda" {
   source = "./lambda"
 
   function_base_name = "core-affinity-static"
-  filename      = "../bin/build-amznlinux1/buzz-core-affinity-static.zip"
-  handler       = "N/A"
-  memory_size   = 1792
-  timeout       = 10
-  runtime       = "provided"
+  filename           = "${local.lambda_build_dir}/buzz-core-affinity-static.zip"
+  handler            = "N/A"
+  memory_size        = 1792
+  timeout            = 10
+  runtime            = "provided"
 
   additional_policies = []
   environment = {

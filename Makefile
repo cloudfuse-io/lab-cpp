@@ -113,6 +113,11 @@ run-local-query-bandwidth:
 	BUILD_FILE=query-bandwidth \
 	make run-bee-local
 
+run-local-query-bandwidth2: 
+	COMPOSE_TYPE=minio \
+	BUILD_FILE=query-bandwidth2 \
+	make run-bee-local
+
 run-local-parquet-arrow-reader:
 	COMPOSE_TYPE=minio \
 	BUILD_FILE=parquet-arrow-reader \
@@ -196,6 +201,7 @@ force-deploy-dev:
 	BUILD_FILE=simd-support make package-bee
 	BUILD_FILE=mem-bandwidth make package-bee
 	BUILD_FILE=raw-alloc make package-bee
+	BUILD_FILE=core-affinity make package-bee
 	@echo "DEPLOYING ${GIT_REVISION} to dev ..."
 	@cd infra; terraform workspace select dev
 	@cd infra; terraform apply --var profile=bbdev --var git_revision=${GIT_REVISION}

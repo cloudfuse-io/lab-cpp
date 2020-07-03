@@ -27,6 +27,7 @@ endmacro()
 if("${BUZZ_BUILD_TESTS}" STREQUAL "ON")
   package_add_test(cust_memory_pool_test cust_memory_pool_test.cc)
   package_add_test(stats_test stats_test.cc)
+  package_add_test(async_queue_test async_queue_test.cc)
 endif()
 
 

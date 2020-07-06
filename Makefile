@@ -184,27 +184,44 @@ run-local-flight-server:
 
 ## deployment commands
 
+# this defaults the file deployed to the generic playground
+GEN_PLAY_FILE ?= simd-support
+
 init-dev:
+	cd infra; terraform workspace select dev
 	cd infra; terraform init
 
-force-deploy-dev-one:
-	make package-bee
+deploy-playground:
+	BUILD_FILE=${GEN_PLAY_FILE} make package-bee
 	@cd infra; terraform workspace select dev
-	cd infra; terraform apply -target=module.${BUILD_FILE}-lambda --var profile=bbdev --var git_revision=${GIT_REVISION} 
+	cd infra; terraform apply \
+		-target=module.generic-playground-lambda \
+		-auto-approve \
+		--var profile=bbdev \
+		--var git_revision=${GIT_REVISION} \
+		--var generic_playground_file=${GEN_PLAY_FILE}
+
+run-playground:
+	@aws lambda invoke \
+		--function-name buzz-cpp-generic-playground-static-dev \
+		--log-type Tail \
+		--region eu-west-1 \
+		--profile bbdev \
+		--query 'LogResult' \
+		--output text \
+		/dev/null | base64 -d
+
+deploy-run-playground: deploy-playground run-playground
 
 force-deploy-dev:
 	BUILD_FILE=query-bandwidth make package-bee
 	BUILD_FILE=query-bandwidth2 make package-bee
-	BUILD_FILE=parquet-arrow-reader make package-bee
-	BUILD_FILE=parquet-raw-reader make package-bee
-	BUILD_FILE=mem-alloc-overprov make package-bee
-	BUILD_FILE=mem-alloc-speed make package-bee
-	BUILD_FILE=simd-support make package-bee
 	BUILD_FILE=mem-bandwidth make package-bee
-	BUILD_FILE=raw-alloc make package-bee
-	BUILD_FILE=core-affinity make package-bee
+	BUILD_FILE=${GEN_PLAY_FILE} make package-bee
 	@echo "DEPLOYING ${GIT_REVISION} to dev ..."
 	@cd infra; terraform workspace select dev
-	@cd infra; terraform apply --var profile=bbdev --var git_revision=${GIT_REVISION}
+	@cd infra; terraform apply \
+		--var profile=bbdev \
+		--var git_revision=${GIT_REVISION} \
+		--var generic_playground_file=${GEN_PLAY_FILE}
 	@echo "${GIT_REVISION} DEPLOYED !!!"
-

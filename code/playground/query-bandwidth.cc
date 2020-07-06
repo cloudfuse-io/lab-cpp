@@ -19,7 +19,7 @@ static int64_t CHUNK_SIZE = util::getenv_int("CHUNK_SIZE", 250000);
 static bool IS_LOCAL = util::getenv_bool("IS_LOCAL", false);
 static int MEMORY_SIZE = util::getenv_int("AWS_LAMBDA_FUNCTION_MEMORY_SIZE", 0);
 static util::Logger LOGGER = util::Logger(IS_LOCAL);
-static int64_t CONTAINTER_RUNS = 0;
+static int64_t CONTAINER_RUNS = 0;
 
 int64_t download_chunck(std::shared_ptr<arrow::io::RandomAccessFile> infile,
                         int64_t start, int64_t nbbytes) {
@@ -29,14 +29,22 @@ int64_t download_chunck(std::shared_ptr<arrow::io::RandomAccessFile> infile,
 }
 
 static aws::lambda_runtime::invocation_response my_handler(
-    std::shared_ptr<arrow::fs::fork::S3FileSystem> fs,
-    aws::lambda_runtime::invocation_request const& req) {
-  CONTAINTER_RUNS++;
+    aws::lambda_runtime::invocation_request const& req,
+    const arrow::fs::fork::S3Options& options) {
+  CONTAINER_RUNS++;
+  // init fs
+  std::shared_ptr<arrow::fs::fork::S3FileSystem> fs;
+  auto scheduler = std::make_shared<util::ResourceScheduler>(1, 1);
+  auto metrics = std::make_shared<util::MetricsManager>();
+  PARQUET_ASSIGN_OR_THROW(
+      fs, arrow::fs::fork::S3FileSystem::Make(options, scheduler, metrics));
+  // init file (calls head)
   auto file_name = "bb-test-data-dev/bid-large.parquet";
   std::shared_ptr<arrow::io::RandomAccessFile> infile;
   fs->GetMetrics()->NewEvent("open_input_file");
   PARQUET_ASSIGN_OR_THROW(infile, fs->OpenInputFile(file_name));
   fs->GetMetrics()->NewEvent("input_file_opened");
+  // get chuncks
   auto start_time = std::chrono::high_resolution_clock::now();
   std::vector<std::future<int64_t>> dl_futures;
   dl_futures.reserve(NB_PARALLEL);
@@ -52,8 +60,8 @@ static aws::lambda_runtime::invocation_response my_handler(
   }
   auto end_time = std::chrono::high_resolution_clock::now();
   auto total_duration = util::get_duration_ms(start_time, end_time);
-  auto entry = LOGGER.NewEntry("bandwidth_stats");
-  entry.IntField("CONTAINTER_RUNS", CONTAINTER_RUNS);
+  auto entry = LOGGER.NewEntry("query_bandwidth");
+  entry.IntField("CONTAINER_RUNS", CONTAINER_RUNS);
   entry.IntField("CHUNK_SIZE", CHUNK_SIZE);
   entry.IntField("MEMORY_SIZE", MEMORY_SIZE);
   entry.IntField("NB_PARALLEL", NB_PARALLEL);
@@ -80,12 +88,8 @@ int main() {
     std::cout << "endpoint_override=" << options.endpoint_override << std::endl;
     options.scheme = "http";
   }
-  std::shared_ptr<arrow::fs::fork::S3FileSystem> fs;
-  auto scheduler = std::make_shared<util::ResourceScheduler>(1, 1);
-  auto metrics = std::make_shared<util::MetricsManager>();
-  PARQUET_ASSIGN_OR_THROW(
-      fs, arrow::fs::fork::S3FileSystem::Make(options, scheduler, metrics));
-  return bootstrap([fs](aws::lambda_runtime::invocation_request const& req) {
-    return my_handler(fs, req);
+
+  return bootstrap([&options](aws::lambda_runtime::invocation_request const& req) {
+    return my_handler(req, options);
   });
 }

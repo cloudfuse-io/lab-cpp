@@ -88,7 +88,8 @@ void LogEntry::Log() {
   if (is_local_) {
     std::cout << buffer_.GetString() << std::endl;
   } else {
-    // add to s3 buffer
+    // TODO add to s3 buffer intead of logging
+    std::cout << buffer_.GetString() << std::endl;
   }
 }
 }  // namespace util

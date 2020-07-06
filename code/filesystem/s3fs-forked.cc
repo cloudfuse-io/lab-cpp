@@ -487,7 +487,6 @@ class ObjectInputFile : public io::RandomAccessFile {
                           resource_scheduler_->IsThreadRegisteredForSync());
 
     // Read the desired range of bytes
-    metrics_manager_->AddRead(nbytes);
     if (is_synchronized) {
       resource_scheduler_->WaitDownloadSlot();
     }

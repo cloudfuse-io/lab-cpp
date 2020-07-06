@@ -26,6 +26,7 @@
 
 #include "bootstrap.h"
 #include "cust_memory_pool.h"
+#include "logger.h"
 #include "s3fs-forked.h"
 #include "scheduler.h"
 #include "stats.h"
@@ -37,6 +38,8 @@ static const int64_t MAX_CONCURRENT_DL = util::getenv_int("MAX_CONCURRENT_DL", 8
 static const int64_t MAX_CONCURRENT_PROC = util::getenv_int("MAX_CONCURRENT_PROC", 1);
 static const int64_t COLUMN_ID = util::getenv_int("COLUMN_ID", 16);
 static const auto mem_pool = new arrow::CustomMemoryPool(arrow::default_memory_pool());
+static const bool IS_LOCAL = util::getenv_bool("IS_LOCAL", false);
+static util::Logger LOGGER = util::Logger(IS_LOCAL);
 
 // Read an entire column chunck by chunck
 void read_single_column_parallel(std::unique_ptr<parquet::ParquetFileReader> reader,
@@ -110,8 +113,7 @@ static aws::lambda_runtime::invocation_response my_handler(
   //// setup s3fs ////
   arrow::fs::fork::S3Options options = arrow::fs::fork::S3Options::Defaults();
   options.region = "eu-west-1";
-  char* is_local = getenv("IS_LOCAL");
-  if (is_local != NULL && strcmp(is_local, "true") == 0) {
+  if (IS_LOCAL) {
     options.endpoint_override = "minio:9000";
     std::cout << "endpoint_override=" << options.endpoint_override << std::endl;
     options.scheme = "http";

@@ -194,6 +194,7 @@ force-deploy-dev-one:
 
 force-deploy-dev:
 	BUILD_FILE=query-bandwidth make package-bee
+	BUILD_FILE=query-bandwidth2 make package-bee
 	BUILD_FILE=parquet-arrow-reader make package-bee
 	BUILD_FILE=parquet-raw-reader make package-bee
 	BUILD_FILE=mem-alloc-overprov make package-bee

@@ -28,8 +28,6 @@
 #include "async_queue.h"
 #include "metrics.h"
 
-const int DOWNLOADER_POOL_SIZE = 12;
-
 /// Options for the S3FileSystem implementation.
 struct S3Options {
   /// AWS region to connect to (default "us-east-1")
@@ -62,7 +60,7 @@ class Downloader {
  public:
   /// The Synchronizer allows the downloader to notify the dispatcher when a new
   /// download is ready
-  Downloader(std::shared_ptr<Synchronizer> synchronizer,
+  Downloader(std::shared_ptr<Synchronizer> synchronizer, int pool_size,
              std::shared_ptr<util::MetricsManager> metrics, const S3Options& options);
 
   /// Add a new download to the threadpool queue

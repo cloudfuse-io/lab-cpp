@@ -22,6 +22,9 @@
 #include "bootstrap.h"
 #include "logger.h"
 
+static const bool IS_LOCAL = util::getenv_bool("IS_LOCAL", false);
+static util::Logger LOGGER = util::Logger(IS_LOCAL);
+
 static aws::lambda_runtime::invocation_response my_handler(
     aws::lambda_runtime::invocation_request const& req) {
   std::vector<int64_t*> arrays;
@@ -47,8 +50,7 @@ static aws::lambda_runtime::invocation_response my_handler(
     auto alloc_duration = util::get_duration_micro(alloc_start_time, alloc_end_time);
     constexpr double GIGA = 1024. * 1024. * 1024.;
     constexpr double array_bytes = array_size * sizeof(int64_t);
-    auto logger = util::Logger(true);
-    auto entry = logger.NewEntry("mem_bandwidth");
+    auto entry = LOGGER.NewEntry("mem_bandwidth");
     entry.FloatField("agg_GBpS", array_bytes / agg_duration * 1000. * 1000. / GIGA);
     entry.IntField("agg_ms", agg_duration / 1000);
     entry.FloatField("alloc_GBpS", array_bytes / alloc_duration * 1000. * 1000. / GIGA);

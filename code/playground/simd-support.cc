@@ -7,11 +7,9 @@
 
 #include "bootstrap.h"
 #include "logger.h"
-#ifdef _MSC_VER
-#include <intrin.h>
-#endif
 
-#ifdef __GNUC__
+static bool IS_LOCAL = util::getenv_bool("IS_LOCAL", false);
+static util::Logger LOGGER = util::Logger(IS_LOCAL);
 
 void __cpuid(int* cpuinfo, int info) {
   __asm__ __volatile__(
@@ -28,9 +26,7 @@ unsigned long long _xgetbv(unsigned int index) {
   return ((unsigned long long)edx << 32) | eax;
 }
 
-#endif
-
-void print_simd_support(util::Logger& logger) {
+void print_simd_support() {
   bool sseSupportted = false;
   bool sse2Supportted = false;
   bool sse3Supportted = false;
@@ -82,7 +78,7 @@ void print_simd_support(util::Logger& logger) {
   }
 
   // ----------------------------------------------------------------------
-  auto entry = logger.NewEntry("supp_simd_instr_sets");
+  auto entry = LOGGER.NewEntry("supp_simd_instr_sets");
   entry.IntField("SSE", sseSupportted);
   entry.IntField("SSE2", sse2Supportted);
   entry.IntField("SSE3", sse3Supportted);
@@ -96,10 +92,9 @@ void print_simd_support(util::Logger& logger) {
 
 static aws::lambda_runtime::invocation_response my_handler(
     aws::lambda_runtime::invocation_request const& req) {
-  util::Logger logger(true);
-  print_simd_support(logger);
+  print_simd_support();
 
-  auto entry = logger.NewEntry("cpu_hardware");
+  auto entry = LOGGER.NewEntry("cpu_hardware");
   entry.IntField("nb_cores",
                  std::thread::hardware_concurrency());  // seems to be always 2
   entry.IntField("current_core", sched_getcpu());       // should be 0 or 1

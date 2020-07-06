@@ -113,10 +113,10 @@ Status GetObjectRange(std::shared_ptr<Aws::S3::S3Client> client, const S3Path& p
 }
 }  // namespace
 
-Downloader::Downloader(std::shared_ptr<Synchronizer> synchronizer,
+Downloader::Downloader(std::shared_ptr<Synchronizer> synchronizer, int pool_size,
                        std::shared_ptr<util::MetricsManager> metrics,
                        const S3Options& options)
-    : queue_(synchronizer, DOWNLOADER_POOL_SIZE), metrics_manager_(metrics) {
+    : queue_(synchronizer, pool_size), metrics_manager_(metrics) {
   Aws::Client::ClientConfiguration client_config_;
   client_config_.region = Aws::Utils::StringUtils::to_string(options.region);
   client_config_.endpointOverride =

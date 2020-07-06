@@ -66,13 +66,6 @@ class MetricsManager::Impl {
       }
       std::cout << std::endl;
     }
-
-    // size stats
-    auto total_dl = 0;
-    for (auto dl : reads_) {
-      total_dl += dl;
-    }
-    std::cout << "nb_dl," << reads_.size() << ",bytes_dl," << total_dl << std::endl;
   }
 
   Status NewEvent(std::string type) {
@@ -85,12 +78,6 @@ class MetricsManager::Impl {
     events_.push_back(event);
     return Status::OK();
   }
-
-  Status AddRead(int64_t read_size) {
-    std::lock_guard<std::mutex> guard(metrics_mutex_);
-    reads_.push_back(read_size);
-    return Status::OK();
-  }
 };
 
 MetricsManager::MetricsManager() : impl_(new Impl{}) {}
@@ -99,7 +86,5 @@ MetricsManager::~MetricsManager() {}
 void MetricsManager::Print() const { impl_->PrintEvents(); }
 
 Status MetricsManager::NewEvent(std::string type) { return impl_->NewEvent(type); }
-
-Status MetricsManager::AddRead(int64_t read_size) { return impl_->AddRead(read_size); }
 
 }  // namespace util

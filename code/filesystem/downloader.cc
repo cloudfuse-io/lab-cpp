@@ -20,6 +20,7 @@
 #include <arrow/result.h>
 #include <aws/core/client/RetryStrategy.h>
 #include <aws/core/utils/stream/PreallocatedStreamBuf.h>
+// #include <aws/s3/model/DeleteObjectRequest.h>
 #include <aws/s3/model/GetObjectRequest.h>
 
 namespace {
@@ -133,6 +134,10 @@ Downloader::Downloader(std::shared_ptr<Synchronizer> synchronizer, int pool_size
   client_.reset(new Aws::S3::S3Client(
       client_config_, Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
       use_virtual_addressing));
+  // Aws::S3::Model::DeleteObjectRequest req;
+  // req.SetBucket(Aws::Utils::StringUtils::to_string("bb-test-data-dev"));
+  // req.SetKey(Aws::Utils::StringUtils::to_string("bid-large-bis.parquet"));
+  // client_->DeleteObject(req);
 }
 
 void Downloader::ScheduleDownload(DownloadRequest request) {

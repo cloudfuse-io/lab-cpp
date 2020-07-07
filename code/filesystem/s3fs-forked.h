@@ -132,6 +132,9 @@ class ARROW_EXPORT S3FileSystem : public FileSystem {
   Result<std::shared_ptr<io::RandomAccessFile>> OpenInputFile(
       const std::string& path) override;
 
+  Result<std::shared_ptr<io::RandomAccessFile>> OpenInputFile(
+      const std::string& s, const int64_t content_length);
+
   /// Create a sequential output stream for writing to a S3 object.
   ///
   /// NOTE: Writes to the stream will be buffered.  Depending on

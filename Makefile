@@ -1,6 +1,7 @@
 GIT_REVISION=`git rev-parse --short HEAD``git diff --quiet HEAD -- || echo "-dirty"`
 PROFILE = $(eval PROFILE := $(shell bash -c 'read -p "Profile: " input; echo $$input'))$(PROFILE)
 STAGE = $(eval STAGE := $(shell bash -c 'read -p "Stage: " input; echo $$input'))$(STAGE)
+SHELL := /bin/bash # Use bash syntax
 
 ## global commands
 
@@ -211,7 +212,28 @@ run-playground:
 		--output text \
 		/dev/null | base64 -d
 
-deploy-run-playground: deploy-playground run-playground
+deploy-run-playground: deploy-playground
+	sleep 2
+	make run-playground
+
+bench-playground:
+	@# change the unused param "handler" to reset lambda state
+	number=1 ; while [[ $$number -le 25 ]] ; do \
+		aws lambda update-function-configuration \
+			--function-name buzz-cpp-generic-playground-static-dev \
+			--handler "N/A-$$number" \
+			--region eu-west-1 \
+			--profile bbdev  > /dev/null 2>&1; \
+		make run-playground 2>&- | grep '^{.*}$$'; \
+		make run-playground 2>&- | grep '^{.*}$$'; \
+		make run-playground 2>&- | grep '^{.*}$$'; \
+		make run-playground 2>&- | grep '^{.*}$$'; \
+		((number = number + 1)) ; \
+	done
+
+deploy-bench-playground: deploy-playground bench-playground
+
+# | grep '^{.*}$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .CONTAINER_RUNS]|@csv'
 
 force-deploy-dev:
 	BUILD_FILE=query-bandwidth make package-bee

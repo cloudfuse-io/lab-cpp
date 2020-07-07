@@ -42,6 +42,7 @@ static aws::lambda_runtime::invocation_response my_handler(
   auto file_name = "bb-test-data-dev/bid-large.parquet";
   std::shared_ptr<arrow::io::RandomAccessFile> infile;
   fs->GetMetrics()->NewEvent("open_input_file");
+  // PARQUET_ASSIGN_OR_THROW(infile, fs->OpenInputFile(file_name, 218890209));
   PARQUET_ASSIGN_OR_THROW(infile, fs->OpenInputFile(file_name));
   fs->GetMetrics()->NewEvent("input_file_opened");
   // get chuncks

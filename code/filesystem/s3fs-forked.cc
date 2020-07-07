@@ -430,6 +430,11 @@ class ObjectInputFile : public io::RandomAccessFile {
     return Status::OK();
   }
 
+  Status Init(int64_t content_length) {
+    content_length_ = content_length;
+    return Status::OK();
+  }
+
   Status CheckClosed() const {
     if (closed_) {
       return Status::Invalid("Operation on closed stream");
@@ -1523,6 +1528,18 @@ Result<std::shared_ptr<io::RandomAccessFile>> S3FileSystem::OpenInputFile(
   auto ptr = std::make_shared<ObjectInputFile>(
       impl_->client_.get(), path, impl_->metrics_manager_, impl_->resource_scheduler_);
   RETURN_NOT_OK(ptr->Init());
+  return ptr;
+}
+
+Result<std::shared_ptr<io::RandomAccessFile>> S3FileSystem::OpenInputFile(
+    const std::string& s, const int64_t content_length) {
+  S3Path path;
+  RETURN_NOT_OK(S3Path::FromString(s, &path));
+  RETURN_NOT_OK(ValidateFilePath(path));
+
+  auto ptr = std::make_shared<ObjectInputFile>(
+      impl_->client_.get(), path, impl_->metrics_manager_, impl_->resource_scheduler_);
+  RETURN_NOT_OK(ptr->Init(content_length));
   return ptr;
 }
 

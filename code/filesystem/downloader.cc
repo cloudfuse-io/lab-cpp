@@ -20,7 +20,7 @@
 #include <arrow/result.h>
 #include <aws/core/client/RetryStrategy.h>
 #include <aws/core/utils/stream/PreallocatedStreamBuf.h>
-// #include <aws/s3/model/DeleteObjectRequest.h>
+#include <aws/s3/model/DeleteObjectRequest.h>
 #include <aws/s3/model/GetObjectRequest.h>
 
 namespace {
@@ -117,7 +117,10 @@ Status GetObjectRange(std::shared_ptr<Aws::S3::S3Client> client, const S3Path& p
 Downloader::Downloader(std::shared_ptr<Synchronizer> synchronizer, int pool_size,
                        std::shared_ptr<util::MetricsManager> metrics,
                        const S3Options& options)
-    : queue_(synchronizer, pool_size), metrics_manager_(metrics) {
+    : queue_(synchronizer, pool_size),
+      metrics_manager_(metrics),
+      pool_size_(pool_size),
+      synchronizer_(synchronizer) {
   Aws::Client::ClientConfiguration client_config_;
   client_config_.region = Aws::Utils::StringUtils::to_string(options.region);
   client_config_.endpointOverride =
@@ -134,20 +137,41 @@ Downloader::Downloader(std::shared_ptr<Synchronizer> synchronizer, int pool_size
   client_.reset(new Aws::S3::S3Client(
       client_config_, Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
       use_virtual_addressing));
-  // Aws::S3::Model::DeleteObjectRequest req;
-  // req.SetBucket(Aws::Utils::StringUtils::to_string("bb-test-data-dev"));
-  // req.SetKey(Aws::Utils::StringUtils::to_string("bid-large-bis.parquet"));
-  // client_->DeleteObject(req);
+}
+
+void Downloader::Init() {
+  //////////// init in all threads ///////////
+  // for (int i = 0; i < pool_size_; i++) {
+  //   queue_.PushRequest([this]() -> Result<DownloadResponse> {
+  //     Aws::S3::Model::DeleteObjectRequest req;
+  //     req.SetBucket(Aws::Utils::StringUtils::to_string("bb-test-data-dev"));
+  //     req.SetKey(Aws::Utils::StringUtils::to_string("bid-large-bis.parquet"));
+  //     this->client_->DeleteObject(req);
+  //     return DownloadResponse{};
+  //   });
+  // }
+  // int threads_inited = 0;
+  // while (threads_inited < pool_size_) {
+  //   synchronizer_->wait();
+  //   auto resps = queue_.PopResponses();
+  //   threads_inited += resps.size();
+  // }
+
+  //////////// init in only one thread ///////////
+  Aws::S3::Model::DeleteObjectRequest req;
+  req.SetBucket(Aws::Utils::StringUtils::to_string("bb-test-data-dev"));
+  req.SetKey(Aws::Utils::StringUtils::to_string("bid-large-bis.parquet"));
+  client_->DeleteObject(req);
 }
 
 void Downloader::ScheduleDownload(DownloadRequest request) {
   queue_.PushRequest([request, this]() -> Result<DownloadResponse> {
     int64_t nbytes = request.range_end - request.range_start + 1;
     ARROW_ASSIGN_OR_RAISE(auto buf, arrow::AllocateResizableBuffer(nbytes));
-    metrics_manager_->NewEvent("get_obj_start");
-    RETURN_NOT_OK(GetObjectRange(client_, request.path, request.range_start, nbytes,
-                                 buf->mutable_data(), metrics_manager_));
-    metrics_manager_->NewEvent("get_obj_end");
+    this->metrics_manager_->NewEvent("get_obj_start");
+    RETURN_NOT_OK(GetObjectRange(this->client_, request.path, request.range_start, nbytes,
+                                 buf->mutable_data(), this->metrics_manager_));
+    this->metrics_manager_->NewEvent("get_obj_end");
     return DownloadResponse{request, std::shared_ptr<arrow::Buffer>(std::move(buf))};
   });
 }

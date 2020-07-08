@@ -1,4 +1,11 @@
-add_library(s3fs-forked STATIC s3fs-forked.cc aws-sdk.cc downloader.cc dispatcher.cc)
+add_library(s3fs-forked STATIC 
+  s3fs-forked.cc
+  aws-sdk.cc
+  downloader.cc
+  dispatcher.cc
+  curl/HttpClientFactory.cpp
+  curl/HttpClient.cpp
+  curl/HandleContainer.cpp)
 target_include_directories(s3fs-forked PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_arrow(s3fs-forked)
 target_link_libraries(s3fs-forked PRIVATE buzz-util)

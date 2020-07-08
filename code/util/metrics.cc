@@ -31,8 +31,7 @@ class MetricsManager::Impl {
  public:
   mutable std::mutex metrics_mutex_;
   std::vector<MetricEvent> events_;
-  std::vector<int64_t> reads_;
-  std::chrono::_V2::system_clock::time_point ref_time =
+  std::chrono::_V2::system_clock::time_point ref_time_ =
       std::chrono::high_resolution_clock::now();
 
   void PrintEvents() const {
@@ -51,14 +50,14 @@ class MetricsManager::Impl {
                   return a.time < b.time;
                 });
       auto first_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-                            metric_events[0].time - ref_time)
+                            metric_events[0].time - ref_time_)
                             .count();
       sorted_threads.insert({first_time, metric_events});
     }
 
     for (const auto& thread : sorted_threads) {
       std::cout << thread.second[0].thread_id;
-      auto previous_time = ref_time;
+      auto previous_time = ref_time_;
       for (const auto& event : thread.second) {
         std::cout << ",";
         std::cout << ::util::get_duration_ms(previous_time, event.time);
@@ -78,6 +77,11 @@ class MetricsManager::Impl {
     events_.push_back(event);
     return Status::OK();
   }
+
+  void Reset() {
+    ref_time_ = std::chrono::high_resolution_clock::now();
+    events_.clear();
+  }
 };
 
 MetricsManager::MetricsManager() : impl_(new Impl{}) {}
@@ -86,5 +90,7 @@ MetricsManager::~MetricsManager() {}
 void MetricsManager::Print() const { impl_->PrintEvents(); }
 
 Status MetricsManager::NewEvent(std::string type) { return impl_->NewEvent(type); }
+
+void MetricsManager::Reset() { impl_->Reset(); }
 
 }  // namespace util

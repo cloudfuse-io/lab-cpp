@@ -63,6 +63,8 @@ class Downloader {
   Downloader(std::shared_ptr<Synchronizer> synchronizer, int pool_size,
              std::shared_ptr<util::MetricsManager> metrics, const S3Options& options);
 
+  void Init();
+
   /// Add a new download to the threadpool queue
   void ScheduleDownload(DownloadRequest request);
 
@@ -70,6 +72,8 @@ class Downloader {
   std::vector<Result<DownloadResponse>> ProcessResponses();
 
  private:
+  int pool_size_;
+  std::shared_ptr<Synchronizer> synchronizer_;
   AsyncQueue<DownloadResponse> queue_;
   std::shared_ptr<Aws::S3::S3Client> client_;
   std::shared_ptr<util::MetricsManager> metrics_manager_;

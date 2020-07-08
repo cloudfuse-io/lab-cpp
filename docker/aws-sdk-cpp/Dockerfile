@@ -1,7 +1,7 @@
 ARG PLATFORM
 FROM ${PLATFORM}
 
-ENV SDK_VERSION 1.7.333
+ENV SDK_VERSION 1.8.4
 
 RUN git clone -b ${SDK_VERSION} --depth 1 https://github.com/aws/aws-sdk-cpp.git /source
 

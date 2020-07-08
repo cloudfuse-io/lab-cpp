@@ -23,14 +23,20 @@ build-lambda-runtime-cpp:
 
 arrow-cpp-hive-build-image: bin-folder
 	cd docker/aws-sdk-cpp && \
-	docker build -t buzz-aws-sdk-cpp-ubuntu --build-arg PLATFORM=cloudfuse/ubuntu-builder:gcc75 .
+	docker build \
+		-t buzz-aws-sdk-cpp-ubuntu \
+		--build-arg PLATFORM=cloudfuse/ubuntu-builder:gcc75 \
+		.
 	git submodule update --init
 	docker build -f docker/arrow-cpp/hive.Dockerfile -t buzz-arrow-cpp-build-hive .
 	# docker run -it buzz-arrow-cpp-build-hive sh
 
 arrow-cpp-bee-build-image: bin-folder build-lambda-runtime-cpp
 	cd docker/aws-sdk-cpp && \
-	docker build -t buzz-aws-sdk-cpp-amznlinux1 --build-arg=PLATFORM=cloudfuse/amazonlinux1-builder:gcc72 .
+	docker build \
+		-t buzz-aws-sdk-cpp-amznlinux1 \
+		--build-arg PLATFORM=cloudfuse/amazonlinux1-builder:gcc72 \
+		.
 	git submodule update --init
 	docker build -f docker/arrow-cpp/bee.Dockerfile -t buzz-arrow-cpp-build-bee .
 	# docker run -it buzz-arrow-cpp-build-bee bash
@@ -231,7 +237,7 @@ bench-playground:
 		((number = number + 1)) ; \
 	done
 
-deploy-bench-playground: deploy-playground bench-playground
+deploy-bench-playground: deploy-playground bench-playground 
 
 # | grep '^{.*}$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .CONTAINER_RUNS]|@csv'
 

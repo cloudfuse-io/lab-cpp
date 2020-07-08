@@ -23,59 +23,53 @@
 #include <atomic>
 #include <mutex>
 
+#include "curl/HttpClientFactory.h"
+
 namespace {
 
 std::mutex aws_init_lock;
 Aws::SDKOptions aws_options;
-std::atomic<bool> aws_initialized(false);
-
-struct AwsSdkGlobalOptions {
-  AwsSdkLogLevel log_level;
-};
-
-void DoInitialize(const AwsSdkGlobalOptions& options) {
-  Aws::Utils::Logging::LogLevel aws_log_level;
+bool aws_initialized = false;
 
 #define LOG_LEVEL_CASE(level_name)                             \
   case AwsSdkLogLevel::level_name:                             \
     aws_log_level = Aws::Utils::Logging::LogLevel::level_name; \
     break;
 
-  switch (options.log_level) {
-    LOG_LEVEL_CASE(Fatal)
-    LOG_LEVEL_CASE(Error)
-    LOG_LEVEL_CASE(Warn)
-    LOG_LEVEL_CASE(Info)
-    LOG_LEVEL_CASE(Debug)
-    LOG_LEVEL_CASE(Trace)
-    default:
-      aws_log_level = Aws::Utils::Logging::LogLevel::Off;
-  }
-
-#undef LOG_LEVEL_CASE
-
-  aws_options.loggingOptions.logLevel = aws_log_level;
-  // By default the AWS SDK logs to files, log to console instead
-  aws_options.loggingOptions.logger_create_fn = [] {
-    return std::make_shared<Aws::Utils::Logging::ConsoleLogSystem>(
-        aws_options.loggingOptions.logLevel);
-  };
-  Aws::InitAPI(aws_options);
-  aws_initialized.store(true);
-}
-
 }  // namespace
 
-void InitializeAwsSdk(const AwsSdkLogLevel& options) {
+void InitializeAwsSdk(const AwsSdkLogLevel& log_level) {
   std::lock_guard<std::mutex> lock(aws_init_lock);
-  if (!aws_initialized.load()) {
-    AwsSdkGlobalOptions options{AwsSdkLogLevel::Fatal};
-    return DoInitialize(options);
+  if (!aws_initialized) {
+    Aws::Utils::Logging::LogLevel aws_log_level;
+    switch (log_level) {
+      LOG_LEVEL_CASE(Fatal)
+      LOG_LEVEL_CASE(Error)
+      LOG_LEVEL_CASE(Warn)
+      LOG_LEVEL_CASE(Info)
+      LOG_LEVEL_CASE(Debug)
+      LOG_LEVEL_CASE(Trace)
+      default:
+        aws_log_level = Aws::Utils::Logging::LogLevel::Warn;
+    }
+    aws_options.loggingOptions.logLevel = aws_log_level;
+    // By default the AWS SDK logs to files, log to console instead
+    aws_options.loggingOptions.logger_create_fn = [] {
+      return std::make_shared<Aws::Utils::Logging::ConsoleLogSystem>(
+          aws_options.loggingOptions.logLevel);
+    };
+    aws_options.httpOptions.httpClientFactory_create_fn = []() {
+      return std::make_shared<Buzz::Http::CustomHttpClientFactory>();
+    };
+    // httpOptions: is setting custom httpClientFactory_create_fn, then initAndCleanupCurl
+    // and installSigPipeHandler should by handled by the custom HttpClientFacory
+    Aws::InitAPI(aws_options);
+    aws_initialized = true;
   }
 }
 
 void FinalizeAwsSdk() {
   std::lock_guard<std::mutex> lock(aws_init_lock);
   Aws::ShutdownAPI(aws_options);
-  aws_initialized.store(false);
+  aws_initialized = false;
 }

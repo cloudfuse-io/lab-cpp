@@ -40,7 +40,7 @@ class MetricsManager {
   ~MetricsManager();
   void Print() const;
   Status NewEvent(std::string type);
-  Status AddRead(int64_t read_size);
+  void Reset();
 
  private:
   class Impl;

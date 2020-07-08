@@ -20,7 +20,11 @@ static aws::lambda_runtime::invocation_response my_handler(
   CONTAINER_RUNS++;
   auto synchronizer = std::make_shared<Synchronizer>();
   auto metrics_manager = std::make_shared<util::MetricsManager>();
+  // metrics_manager->Reset();
   Downloader downloader{synchronizer, MAX_PARALLEL, metrics_manager, options};
+  metrics_manager->NewEvent("init_started");
+  downloader.Init();
+  metrics_manager->NewEvent("init_done");
   auto start_time = std::chrono::high_resolution_clock::now();
   for (int i = 0; i < NB_CHUNCK; i++) {
     downloader.ScheduleDownload({i * CHUNK_SIZE,
@@ -33,9 +37,13 @@ static aws::lambda_runtime::invocation_response my_handler(
   while (downloaded_chuncks < NB_CHUNCK) {
     synchronizer->wait();
     auto results = downloader.ProcessResponses();
-    downloaded_chuncks += results.size();
     for (auto& result : results) {
-      downloaded_bytes += result.ValueOrDie().raw_data->size();
+      auto response = result.ValueOrDie();
+      if (response.raw_data == nullptr) {
+        continue;
+      }
+      downloaded_chuncks++;
+      downloaded_bytes += response.raw_data->size();
     }
   }
   auto end_time = std::chrono::high_resolution_clock::now();
@@ -57,7 +65,7 @@ static aws::lambda_runtime::invocation_response my_handler(
 
 int main() {
   // init SDK
-  InitializeAwsSdk(AwsSdkLogLevel::Warn);
+  InitializeAwsSdk(AwsSdkLogLevel::Debug);
   // init s3 client
   S3Options options;
   options.region = "eu-west-1";

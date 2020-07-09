@@ -28,6 +28,11 @@
 #include "async_queue.h"
 #include "metrics.h"
 
+#if !defined(BUZZ_STATUS_ABORT)
+#define BUZZ_STATUS_ABORT 1
+const Status STATUS_ABORTED(StatusCode::UnknownError, "query_aborted");
+#endif
+
 /// Options for the S3FileSystem implementation.
 struct S3Options {
   /// AWS region to connect to (default "us-east-1")
@@ -45,6 +50,7 @@ struct S3Path {
   std::string key;
 };
 
+/// if range_start==range_end==0 this is an init request
 struct DownloadRequest {
   int64_t range_start;
   int64_t range_end;
@@ -63,7 +69,9 @@ class Downloader {
   Downloader(std::shared_ptr<Synchronizer> synchronizer, int pool_size,
              std::shared_ptr<util::MetricsManager> metrics, const S3Options& options);
 
-  void Init();
+  /// max_init_count should be <= than pool_size
+  /// TODO: if called again before previous init complete, behaviour is undefined
+  void InitConnections(std::string bucket, int max_init_count);
 
   /// Add a new download to the threadpool queue
   void ScheduleDownload(DownloadRequest request);
@@ -77,4 +85,7 @@ class Downloader {
   AsyncQueue<DownloadResponse> queue_;
   std::shared_ptr<Aws::S3::S3Client> client_;
   std::shared_ptr<util::MetricsManager> metrics_manager_;
+  int init_counter_;
+  std::condition_variable init_interruption_cv_;
+  std::mutex init_interruption_mutex_;
 };

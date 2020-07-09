@@ -34,7 +34,10 @@ function(TARGET_LINK_ARROW TARGET_NAME)
   )
 endfunction()
 
+set(CMAKE_BUILD_TYPE_SAVED "${CMAKE_BUILD_TYPE}")
+set(CMAKE_BUILD_TYPE Release)
 add_subdirectory(arrow/cpp)
+set(CMAKE_BUILD_TYPE "${BUILD_TYPE_SAVED}")
 add_subdirectory(util)
 add_subdirectory(filesystem)
 

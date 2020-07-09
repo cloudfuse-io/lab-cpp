@@ -24,7 +24,7 @@
 #include "toolbox.h"
 
 template <typename Func>
-int bootstrap(Func handler) {
+void bootstrap(Func handler) {
   if (util::getenv_bool("IS_LOCAL", false)) {
     aws::lambda_runtime::invocation_response response =
         handler(aws::lambda_runtime::invocation_request());
@@ -32,5 +32,4 @@ int bootstrap(Func handler) {
   } else {
     aws::lambda_runtime::run_handler(handler);
   }
-  return 0;
 }

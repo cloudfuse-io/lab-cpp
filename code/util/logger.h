@@ -17,15 +17,14 @@
 
 #pragma once
 
+#include <arrow/vendored/datetime.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
-#include <boost/date_time/posix_time/posix_time.hpp>
 #include <iostream>
 
 namespace util {
 using namespace rapidjson;
-using namespace boost::posix_time;
 
 class LogEntry {
  public:
@@ -63,7 +62,10 @@ LogEntry::LogEntry(const char* msg, bool is_local)
     : buffer_(), writer_(buffer_), is_local_(is_local) {
   writer_.StartObject();
   writer_.Key("time");
-  writer_.String(to_iso_extended_string(microsec_clock::universal_time()).data());
+  auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(
+      std::chrono::system_clock::now());
+  auto datestring = arrow_vendored::date::format("%FT%T%z", now);
+  writer_.String(datestring.data());
   writer_.Key("msg");
   writer_.String(msg);
 }

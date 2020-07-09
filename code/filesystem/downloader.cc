@@ -23,6 +23,8 @@
 #include <aws/s3/model/DeleteObjectRequest.h>
 #include <aws/s3/model/GetObjectRequest.h>
 
+#include <cassert>
+
 namespace {
 template <typename Error>
 inline bool IsConnectError(const Aws::Client::AWSError<Error>& error) {
@@ -84,7 +86,10 @@ class StringViewStream : Aws::Utils::Stream::PreallocatedStreamBuf, public std::
 };
 
 Aws::IOStreamFactory AwsWriteableStreamFactory(void* data, int64_t nbytes) {
-  return [data, nbytes]() { return new StringViewStream(data, nbytes); };
+  return [data, nbytes]() {
+    // Aws::New to avoid Valgrind "Mismatched free"
+    return Aws::New<StringViewStream>("downloader", data, nbytes);
+  };
 }
 
 Status S3ErrorToStatus(const Aws::Client::AWSError<Aws::S3::S3Errors>& error) {
@@ -104,11 +109,11 @@ Status GetObjectRange(std::shared_ptr<Aws::S3::S3Client> client, const S3Path& p
   if (!object_outcome.IsSuccess()) {
     return S3ErrorToStatus(object_outcome.GetError());
   }
-  auto object_result = object_outcome.GetResultWithOwnership();
-  object_result.GetBody().ignore(length);
-  if (object_result.GetBody().gcount() != length) {
-    return Status::IOError("Read ", object_result.GetBody().gcount(),
-                           " bytes instead of ", length);
+  auto object_result = std::move(object_outcome).GetResultWithOwnership();
+  auto& stream = object_result.GetBody();
+  stream.ignore(length);
+  if (stream.gcount() != length) {
+    return Status::IOError("Read ", stream.gcount(), " bytes instead of ", length);
   }
   return Status::OK();
 }
@@ -139,32 +144,51 @@ Downloader::Downloader(std::shared_ptr<Synchronizer> synchronizer, int pool_size
       use_virtual_addressing));
 }
 
-void Downloader::Init() {
-  //////////// init in all threads ///////////
-  // for (int i = 0; i < pool_size_; i++) {
-  //   queue_.PushRequest([this]() -> Result<DownloadResponse> {
-  //     Aws::S3::Model::DeleteObjectRequest req;
-  //     req.SetBucket(Aws::Utils::StringUtils::to_string("bb-test-data-dev"));
-  //     req.SetKey(Aws::Utils::StringUtils::to_string("bid-large-bis.parquet"));
-  //     this->client_->DeleteObject(req);
-  //     return DownloadResponse{};
-  //   });
-  // }
-  // int threads_inited = 0;
-  // while (threads_inited < pool_size_) {
-  //   synchronizer_->wait();
-  //   auto resps = queue_.PopResponses();
-  //   threads_inited += resps.size();
-  // }
-
-  //////////// init in only one thread ///////////
-  Aws::S3::Model::DeleteObjectRequest req;
-  req.SetBucket(Aws::Utils::StringUtils::to_string("bb-test-data-dev"));
-  req.SetKey(Aws::Utils::StringUtils::to_string("bid-large-bis.parquet"));
-  client_->DeleteObject(req);
+void Downloader::InitConnections(std::string bucket, int max_init_count) {
+  assert(max_init_count <= pool_size_);
+  {
+    const std::lock_guard<std::mutex> lock(init_interruption_mutex_);
+    init_counter_ = 0;
+  }
+  for (int i = 0; i < max_init_count; i++) {
+    queue_.PushRequest([this, bucket, max_init_count]() -> Result<DownloadResponse> {
+      {
+        const std::lock_guard<std::mutex> lock(init_interruption_mutex_);
+        if (init_counter_ >= max_init_count) {
+          return STATUS_ABORTED;
+        }
+      }
+      // use Delete requests because they are free hahaha...
+      Aws::S3::Model::DeleteObjectRequest req;
+      req.SetBucket(Aws::Utils::StringUtils::to_string(bucket));
+      req.SetKey(Aws::Utils::StringUtils::to_string("fakekey"));
+      // we block before releasing the connection to allow up to
+      // max_init_count initializations
+      req.SetDataReceivedEventHandler([this, max_init_count](
+                                          const Aws::Http::HttpRequest*,
+                                          Aws::Http::HttpResponse*, long long) -> void {
+        std::unique_lock<std::mutex> lock(init_interruption_mutex_);
+        init_counter_++;
+        if (init_counter_ < max_init_count) {
+          init_interruption_cv_.wait(
+              lock, [this, max_init_count]() { return init_counter_ >= max_init_count; });
+        } else {
+          lock.unlock();
+          init_interruption_cv_.notify_all();
+        }
+      });
+      client_->DeleteObject(req);
+      return DownloadResponse{};
+    });
+  }
 }
 
 void Downloader::ScheduleDownload(DownloadRequest request) {
+  {
+    const std::lock_guard<std::mutex> lock(init_interruption_mutex_);
+    init_counter_ = pool_size_;
+  }
+  init_interruption_cv_.notify_all();
   queue_.PushRequest([request, this]() -> Result<DownloadResponse> {
     int64_t nbytes = request.range_end - request.range_start + 1;
     ARROW_ASSIGN_OR_RAISE(auto buf, arrow::AllocateResizableBuffer(nbytes));

@@ -16,14 +16,6 @@ namespace Http {
 #define NUM_LOCKS CURL_LOCK_DATA_LAST
 static std::mutex share_lock[NUM_LOCKS];
 
-// static void init_locks(void) {
-//   for (int i = 0; i < NUM_LOCKS; i++) pthread_mutex_init(&share_lock[i], NULL);
-// }
-
-// static void kill_locks(void) {
-//   for (int i = 0; i < NUM_LOCKS; i++) pthread_mutex_destroy(&(share_lock[i]));
-// }
-
 static void lock_cb(CURL* handle, curl_lock_data data, curl_lock_access access,
                     void* userptr) {
   share_lock[data].lock();
@@ -59,6 +51,7 @@ CurlHandleContainer::~CurlHandleContainer() {
     curl_easy_cleanup(handle);
   }
   if (m_shobject != nullptr) {
+    AWS_LOGSTREAM_DEBUG(CURL_HANDLE_CONTAINER_TAG, "Cleaning up shared state");
     curl_share_cleanup(m_shobject);
   }
 }
@@ -93,7 +86,6 @@ void CurlHandleContainer::ReleaseCurlHandle(CURL* handle) {
 }
 
 void CurlHandleContainer::DestroyCurlHandle(CURL* handle) {
-  std::cout << "CurlHandleContainer::DestroyCurlHandle" << std::endl;
   if (!handle) {
     return;
   }
@@ -115,15 +107,14 @@ bool CurlHandleContainer::CheckAndGrowPool() {
     unsigned amountToAdd = (std::min)(multiplier * 2, m_maxPoolSize - m_poolSize);
     if (m_shobject == nullptr) {
       m_shobject = curl_share_init();
-      std::cout << "CURLSHOPT_SHARE,CURL_LOCK_DATA_DNS" << std::endl;
+      /// dns resolution typically takes ~10ms
       curl_share_setopt(m_shobject, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
-      std::cout << "CURLSHOPT_SHARE,CURL_LOCK_DATA_SSL_SESSION" << std::endl;
+      /// ssl session establishement takes ~100ms
       curl_share_setopt(m_shobject, CURLSHOPT_SHARE, CURL_LOCK_DATA_SSL_SESSION);
-      std::cout << "CURLSHOPT_SHARE,CURL_LOCK_DATA_CONNECT " << std::endl;
-      curl_share_setopt(m_shobject, CURLSHOPT_SHARE, CURL_LOCK_DATA_CONNECT);
-      std::cout << "CURLSHOPT_LOCKFUNC " << std::endl;
+      /// connection establishement is mostly dominated by ssl handshake, so ~100ms
+      // curl_share_setopt(m_shobject, CURLSHOPT_SHARE, CURL_LOCK_DATA_CONNECT);
+      /// set lock/unlock of shared state
       curl_share_setopt(m_shobject, CURLSHOPT_LOCKFUNC, lock_cb);
-      std::cout << "CURLSHOPT_UNLOCKFUNC " << std::endl;
       curl_share_setopt(m_shobject, CURLSHOPT_UNLOCKFUNC, unlock_cb);
     }
     AWS_LOGSTREAM_DEBUG(CURL_HANDLE_CONTAINER_TAG,

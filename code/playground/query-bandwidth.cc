@@ -90,7 +90,7 @@ int main() {
     options.scheme = "http";
   }
 
-  return bootstrap([&options](aws::lambda_runtime::invocation_request const& req) {
+  bootstrap([&options](aws::lambda_runtime::invocation_request const& req) {
     return my_handler(req, options);
   });
 }

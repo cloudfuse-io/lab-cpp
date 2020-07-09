@@ -5,6 +5,4 @@ services:
     image: buzz-arrow-cpp-build-bee
     volumes:
       - ${CURDIR}/bin/build-amznlinux1:/build
-    entrypoint: /build/executables/buzz-${BUILD_FILE}-static
-    environment:
-      VALGRIND_CMD: ${VALGRIND_CMD}
+    entrypoint: ${VALGRIND_CMD} /build/executables/buzz-${BUILD_FILE}-static

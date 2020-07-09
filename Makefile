@@ -99,6 +99,7 @@ compose-clean-run-bee:
 		-f docker/amznlinux1-run-cpp/docker-compose.${RUNTIME}.yaml \
 		rm -fsv
 
+VALGRIND_CMD ?= ""
 # VALGRIND_CMD="valgrind --leak-check=yes"
 # VALGRIND_CMD="valgrind --pages-as-heap=yes --tool=massif"
 # docker cp amznlinux1-run-cpp_lambda-emulator_1:/massif.out.1 massif.out.1
@@ -110,7 +111,7 @@ else
 	BUILD_FILE=${BUILD_FILE} make build-bee
 endif
 	CURDIR=${CURDIR} \
-	VALGRIND_CMD="" \
+	VALGRIND_CMD="${VALGRIND_CMD}" \
 	COMPOSE_TYPE=${COMPOSE_TYPE} \
 	BUILD_FILE=${BUILD_FILE} \
 	make compose-clean-run-bee

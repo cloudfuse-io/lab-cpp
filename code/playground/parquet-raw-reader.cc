@@ -166,5 +166,5 @@ int main() {
   arrow::fs::fork::S3GlobalOptions options;
   options.log_level = arrow::fs::fork::S3LogLevel::Warn;
   PARQUET_THROW_NOT_OK(InitializeS3(options));
-  return bootstrap(my_handler);
+  bootstrap(my_handler);
 }

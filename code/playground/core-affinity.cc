@@ -17,6 +17,7 @@
 
 #include <aws/lambda-runtime/runtime.h>
 
+#include <cmath>
 #include <thread>
 
 #include "bootstrap.h"
@@ -87,4 +88,4 @@ static aws::lambda_runtime::invocation_response my_handler(
   return aws::lambda_runtime::invocation_response::success("Done", "text/plain");
 }
 
-int main() { return bootstrap(my_handler); }
+int main() { bootstrap(my_handler); }

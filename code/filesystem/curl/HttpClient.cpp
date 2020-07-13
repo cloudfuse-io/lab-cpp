@@ -84,12 +84,23 @@ static size_t WriteData(char* ptr, size_t size, size_t nmemb, void* userdata) {
 static size_t WriteHeader(char* ptr, size_t size, size_t nmemb, void* userdata) {
   if (ptr) {
     AWS_LOGSTREAM_TRACE(CURL_HTTP_CLIENT_TAG, ptr);
-    Aws::Http::HttpResponse* response = (Aws::Http::HttpResponse*)userdata;
+    CurlWriteCallbackContext* context =
+        reinterpret_cast<CurlWriteCallbackContext*>(userdata);
+    Aws::Http::HttpResponse* response = context->m_response;
     Aws::String headerLine(ptr);
     Aws::Vector<Aws::String> keyValuePair =
         Aws::Utils::StringUtils::Split(headerLine, ':', 2);
 
     if (keyValuePair.size() == 2) {
+      // call receive handler with size 0 on first header
+      if (response->GetHeaders().size() == 0) {
+        auto& receivedHandler = context->m_request->GetDataReceivedEventHandler();
+        if (receivedHandler) {
+          receivedHandler(context->m_request, context->m_response,
+                          static_cast<long long>(0));
+        }
+      }
+      // parse header into response
       response->AddHeader(Aws::Utils::StringUtils::Trim(keyValuePair[0].c_str()),
                           Aws::Utils::StringUtils::Trim(keyValuePair[1].c_str()));
     }
@@ -122,7 +133,6 @@ static size_t ReadBody(char* ptr, size_t size, size_t nmemb, void* userdata) {
     if (sentHandler) {
       sentHandler(request, static_cast<long long>(amountRead));
     }
-
     if (context->m_rateLimiter) {
       context->m_rateLimiter->ApplyAndPayForCost(static_cast<int64_t>(amountRead));
     }
@@ -378,7 +388,7 @@ std::shared_ptr<Aws::Http::HttpResponse> CurlHttpClient::MakeRequest(
     curl_easy_setopt(connectionHandle, CURLOPT_WRITEFUNCTION, WriteData);
     curl_easy_setopt(connectionHandle, CURLOPT_WRITEDATA, &writeContext);
     curl_easy_setopt(connectionHandle, CURLOPT_HEADERFUNCTION, WriteHeader);
-    curl_easy_setopt(connectionHandle, CURLOPT_HEADERDATA, response.get());
+    curl_easy_setopt(connectionHandle, CURLOPT_HEADERDATA, &writeContext);
 
     // we only want to override the default path if someone has explicitly told us to.
     if (!m_caPath.empty()) {

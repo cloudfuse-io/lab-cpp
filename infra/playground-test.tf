@@ -25,7 +25,7 @@ locals {
       memory_size = 2048
       environment = {
         NB_PARALLEL : 12
-        CHUNK_SIZE  : 250000
+        CHUNK_SIZE : 250000
       }
       additional_policies = [aws_iam_policy.s3-additional-policy.arn]
     }
@@ -34,7 +34,7 @@ locals {
       environment = {
         NB_CHUNCK : 12
         MAX_PARALLEL : 12
-        CHUNK_SIZE  : 250000
+        CHUNK_SIZE : 250000
       }
       additional_policies = [aws_iam_policy.s3-additional-policy.arn]
     }
@@ -99,7 +99,7 @@ module "generic-playground-lambda" {
   runtime            = "provided"
 
   additional_policies = local.playground[var.generic_playground_file].additional_policies
-  
+
   environment = merge(
     {
       BUILD_FILE = var.generic_playground_file

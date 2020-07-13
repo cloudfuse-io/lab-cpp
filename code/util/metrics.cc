@@ -25,20 +25,74 @@
 
 namespace util {
 
-using namespace arrow;
+namespace {
+
+/// a simple mutex synched append only vect
+template <class T>
+class concurrent_vector {
+ public:
+  void push_back(T elem) {
+    std::lock_guard<std::mutex> guard(mutex_);
+    vect_.push_back(elem);
+  }
+
+  std::vector<T> clone() const {
+    std::lock_guard<std::mutex> guard(mutex_);
+    std::vector<T> copy_vect;
+    copy_vect.reserve(vect_.size());
+    for (auto& item : vect_) {
+      copy_vect.push_back(item);
+    }
+    return copy_vect;
+  }
+
+  void clear() {
+    std::lock_guard<std::mutex> guard(mutex_);
+    vect_.clear();
+  }
+
+ private:
+  mutable std::mutex mutex_;
+  std::vector<T> vect_;
+};
+
+struct MetricEvent {
+  std::chrono::_V2::system_clock::time_point time;
+  std::thread::id thread_id;
+  std::string type;
+};
+
+struct Download {
+  std::chrono::_V2::system_clock::time_point time;
+  std::thread::id thread_id;
+  int64_t duration_ms;
+  int64_t size;
+};
+
+struct InitConnection {
+  std::chrono::_V2::system_clock::time_point time;
+  std::thread::id thread_id;
+  int64_t total_duration_ms;
+  int64_t resolution_time_ms;
+  int64_t blocking_time_ms;
+};
+}  // namespace
 
 class MetricsManager::Impl {
  public:
-  mutable std::mutex metrics_mutex_;
-  std::vector<MetricEvent> events_;
+  util::Logger logger_;
+  concurrent_vector<MetricEvent> events_;
+  concurrent_vector<Download> downloads_;
+  concurrent_vector<InitConnection> init_connections_;
   std::chrono::_V2::system_clock::time_point ref_time_ =
       std::chrono::high_resolution_clock::now();
 
+  Impl(util::Logger logger) : logger_(logger) {}
+
   void PrintEvents() const {
     // event timing stats
-    std::lock_guard<std::mutex> guard(metrics_mutex_);
     std::map<std::thread::id, std::vector<MetricEvent>> thread_map;
-    for (const auto& event : events_) {
+    for (const auto& event : events_.clone()) {
       thread_map[event.thread_id].push_back(event);
     }
 
@@ -67,29 +121,84 @@ class MetricsManager::Impl {
     }
   }
 
-  Status NewEvent(std::string type) {
+  void NewEvent(std::string type) {
     MetricEvent event{
         std::chrono::high_resolution_clock::now(),
         std::this_thread::get_id(),
         type,
     };
-    std::lock_guard<std::mutex> guard(metrics_mutex_);
     events_.push_back(event);
-    return Status::OK();
+  }
+
+  void PrintDownloads() const {
+    for (const auto& event : downloads_.clone()) {
+      auto entry = logger_.NewEntry("downloads");
+      entry.IntField("duration_ms", event.duration_ms);
+      entry.IntField("size_B", event.size);
+      entry.FloatField("speed_MBpS", (double)event.size / (double)event.duration_ms);
+      entry.Log();
+    }
+  }
+
+  void NewDownload(int64_t duration_ms, int64_t size) {
+    Download download{
+        std::chrono::high_resolution_clock::now(),
+        std::this_thread::get_id(),
+        duration_ms,
+        size,
+    };
+    downloads_.push_back(download);
+  }
+
+  void PrintInitConnections() const {
+    for (const auto& event : init_connections_.clone()) {
+      auto entry = logger_.NewEntry("init_connection");
+      entry.IntField("total_duration_ms", event.total_duration_ms);
+      entry.IntField("blocking_time_ms", event.blocking_time_ms);
+      entry.IntField("resolution_time_ms", event.resolution_time_ms);
+      entry.Log();
+    }
+  }
+
+  void NewInitConnection(int64_t total_duration_ms, int64_t resolution_time_ms,
+                         int64_t blocking_time_ms) {
+    InitConnection init_connection{
+        std::chrono::high_resolution_clock::now(),
+        std::this_thread::get_id(),
+        total_duration_ms,
+        resolution_time_ms,
+        blocking_time_ms,
+    };
+    init_connections_.push_back(init_connection);
   }
 
   void Reset() {
     ref_time_ = std::chrono::high_resolution_clock::now();
     events_.clear();
+    downloads_.clear();
+    init_connections_.clear();
   }
 };
 
-MetricsManager::MetricsManager() : impl_(new Impl{}) {}
+MetricsManager::MetricsManager(Logger logger) : impl_(new Impl{logger}) {}
 MetricsManager::~MetricsManager() {}
 
-void MetricsManager::Print() const { impl_->PrintEvents(); }
+void MetricsManager::Print() const {
+  impl_->PrintEvents();
+  impl_->PrintInitConnections();
+  impl_->PrintDownloads();
+}
 
-Status MetricsManager::NewEvent(std::string type) { return impl_->NewEvent(type); }
+void MetricsManager::NewEvent(std::string type) { impl_->NewEvent(type); }
+
+void MetricsManager::NewDownload(int64_t duration_ms, int64_t size) {
+  impl_->NewDownload(duration_ms, size);
+}
+void MetricsManager::NewInitConnection(int64_t total_duration_ms,
+                                       int64_t resolution_time_ms,
+                                       int64_t blocking_time_ms) {
+  impl_->NewInitConnection(total_duration_ms, resolution_time_ms, blocking_time_ms);
+}
 
 void MetricsManager::Reset() { impl_->Reset(); }
 

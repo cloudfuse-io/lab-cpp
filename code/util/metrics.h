@@ -17,29 +17,35 @@
 
 #pragma once
 
-#include <arrow/status.h>
-
+#include <map>
 #include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
 
+#include "logger.h"
+
 namespace util {
-
-using namespace arrow;
-
-struct MetricEvent {
-  std::chrono::_V2::system_clock::time_point time;
-  std::thread::id thread_id;
-  std::string type;
-};
 
 class MetricsManager {
  public:
-  MetricsManager();
+  MetricsManager(Logger logger);
   ~MetricsManager();
+
   void Print() const;
-  Status NewEvent(std::string type);
+
+  /// events help to reconsitute the execution timelines thread by thread
+  void NewEvent(std::string type);
+
+  /// track all individual download to detect eventual stragglers
+  void NewDownload(int64_t duration_ms, int64_t size);
+
+  /// track all ssl connection init requests to ensure that they do not slow down the
+  /// downloader
+  void NewInitConnection(int64_t total_duration_ms, int64_t resolution_time_ms,
+                         int64_t blocking_time_ms);
+
+  /// Empty the manager to start tracking a new execution that maintained previous context
   void Reset();
 
  private:

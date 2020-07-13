@@ -19,17 +19,20 @@ static aws::lambda_runtime::invocation_response my_handler(
     const aws::lambda_runtime::invocation_request& req, const S3Options& options) {
   CONTAINER_RUNS++;
   auto synchronizer = std::make_shared<Synchronizer>();
-  auto metrics_manager = std::make_shared<util::MetricsManager>();
+  auto metrics_manager = std::make_shared<util::MetricsManager>(LOGGER);
   // metrics_manager->Reset();
   Downloader downloader{synchronizer, MAX_PARALLEL, metrics_manager, options};
   auto nb_inits = MAX_PARALLEL;
   downloader.InitConnections("bb-test-data-dev", nb_inits);
   int inits_completed = 0;
   while (inits_completed < nb_inits) {
+    // wait for all inits to be finised before moving to dl
+    // in the dispatcher loop, we'll move forward as the metada request responded
     synchronizer->wait();
     auto results = downloader.ProcessResponses();
     inits_completed += results.size();
   }
+  // start download
   auto start_time = std::chrono::high_resolution_clock::now();
   for (int i = 0; i < NB_CHUNCK; i++) {
     downloader.ScheduleDownload({i * CHUNK_SIZE,
@@ -57,6 +60,8 @@ static aws::lambda_runtime::invocation_response my_handler(
   }
   auto end_time = std::chrono::high_resolution_clock::now();
   auto total_duration = util::get_duration_ms(start_time, end_time);
+  metrics_manager->NewEvent("handler_end");
+  metrics_manager->Print();
   auto entry = LOGGER.NewEntry("query_bandwidth2");
   entry.IntField("CONTAINER_RUNS", CONTAINER_RUNS);
   entry.IntField("NB_CHUNCK", NB_CHUNCK);
@@ -69,8 +74,6 @@ static aws::lambda_runtime::invocation_response my_handler(
   // entry.IntField("inits_aborted", inits_aborted);
   entry.FloatField("speed_MBpS", downloaded_bytes / 1000000. / (total_duration / 1000.));
   entry.Log();
-  metrics_manager->NewEvent("handler_end");
-  metrics_manager->Print();
   return aws::lambda_runtime::invocation_response::success("Done", "text/plain");
 }
 

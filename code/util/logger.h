@@ -44,54 +44,10 @@ class LogEntry {
 class Logger {
  public:
   Logger(bool is_local);
-  LogEntry NewEntry(const char* msg, bool is_local = true) {
-    return LogEntry(msg, is_local_);
-  }
+  LogEntry NewEntry(const char* msg) const { return LogEntry(msg, is_local_); }
 
  private:
   bool is_local_;
 };
 
-Logger::Logger(bool is_local) : is_local_(is_local) {
-  if (!is_local) {
-    // init s3
-  }
-}
-
-LogEntry::LogEntry(const char* msg, bool is_local)
-    : buffer_(), writer_(buffer_), is_local_(is_local) {
-  writer_.StartObject();
-  writer_.Key("time");
-  auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(
-      std::chrono::system_clock::now());
-  auto datestring = arrow_vendored::date::format("%FT%T%z", now);
-  writer_.String(datestring.data());
-  writer_.Key("msg");
-  writer_.String(msg);
-}
-
-void LogEntry::StrField(const char* key, const char* value) {
-  writer_.Key(key);
-  writer_.String(value);
-}
-
-void LogEntry::IntField(const char* key, int64_t value) {
-  writer_.Key(key);
-  writer_.Int64(value);
-}
-
-void LogEntry::FloatField(const char* key, double value) {
-  writer_.Key(key);
-  writer_.Double(value);
-}
-
-void LogEntry::Log() {
-  writer_.EndObject();
-  if (is_local_) {
-    std::cout << buffer_.GetString() << std::endl;
-  } else {
-    // TODO add to s3 buffer intead of logging
-    std::cout << buffer_.GetString() << std::endl;
-  }
-}
 }  // namespace util

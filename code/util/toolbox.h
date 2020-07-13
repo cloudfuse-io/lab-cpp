@@ -57,4 +57,7 @@ inline const char* getenv(const char* name, const char* def) {
   }
   return raw_var;
 }
+
+using time = std::chrono::high_resolution_clock;
+
 }  // namespace util

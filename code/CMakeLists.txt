@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.17)
 project(buzz-cpp VERSION 0.1)
 
-set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/executables )
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/executables)
 
 include(FetchContent)
 
@@ -39,7 +39,7 @@ set(CMAKE_BUILD_TYPE Release)
 add_subdirectory(arrow/cpp)
 set(CMAKE_BUILD_TYPE "${BUILD_TYPE_SAVED}")
 add_subdirectory(util)
-add_subdirectory(filesystem)
+add_subdirectory(aws)
 
 # TODO remove following when s3fs fully replaced
 find_package(AWSSDK COMPONENTS config s3 transfer)
@@ -66,7 +66,7 @@ elseif(BUZZ_BUILD_FILE)
   list(APPEND BUZZ_ALL ${BUZZ_TARGET})
 
   target_link_libraries(${BUZZ_TARGET}
-    PRIVATE AWS::aws-lambda-runtime s3fs-forked buzz-util
+    PRIVATE AWS::aws-lambda-runtime buzz-aws buzz-util
   )
   target_link_arrow(${BUZZ_TARGET})
 else()

@@ -108,7 +108,7 @@ static aws::lambda_runtime::invocation_response my_handler(
     aws::lambda_runtime::invocation_request const& req) {
   auto scheduler =
       std::make_shared<util::ResourceScheduler>(MAX_CONCURRENT_DL, MAX_CONCURRENT_PROC);
-  auto metrics = std::make_shared<util::MetricsManager>();
+  auto metrics = std::make_shared<util::MetricsManager>(LOGGER);
 
   //// setup s3fs ////
   arrow::fs::fork::S3Options options = arrow::fs::fork::S3Options::Defaults();

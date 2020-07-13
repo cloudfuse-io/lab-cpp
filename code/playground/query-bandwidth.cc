@@ -1,4 +1,3 @@
-
 #include <arrow/api.h>
 #include <arrow/compute/api.h>
 #include <arrow/io/api.h>
@@ -35,7 +34,7 @@ static aws::lambda_runtime::invocation_response my_handler(
   // init fs
   std::shared_ptr<arrow::fs::fork::S3FileSystem> fs;
   auto scheduler = std::make_shared<util::ResourceScheduler>(1, 1);
-  auto metrics = std::make_shared<util::MetricsManager>();
+  auto metrics = std::make_shared<util::MetricsManager>(LOGGER);
   PARQUET_ASSIGN_OR_THROW(
       fs, arrow::fs::fork::S3FileSystem::Make(options, scheduler, metrics));
   // init file (calls head)

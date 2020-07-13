@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "aws-sdk.h"
+#include "sdk-init.h"
 
 #include <aws/core/Aws.h>
 #include <aws/core/utils/logging/ConsoleLogSystem.h>

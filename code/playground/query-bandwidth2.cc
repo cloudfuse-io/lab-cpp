@@ -1,7 +1,7 @@
 
 #include <aws/lambda-runtime/runtime.h>
 
-#include "aws-sdk.h"
+#include "sdk-init.h"
 #include "bootstrap.h"
 #include "downloader.h"
 #include "logger.h"

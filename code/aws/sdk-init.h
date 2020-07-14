@@ -24,3 +24,15 @@ enum class AwsSdkLogLevel : int8_t { Off, Fatal, Error, Warn, Info, Debug, Trace
 void InitializeAwsSdk(const AwsSdkLogLevel& options);
 
 void FinalizeAwsSdk();
+
+/// Options for sdk clients.
+struct SdkOptions {
+  /// AWS region to connect to (default "us-east-1")
+  std::string region = "us-east-1";
+
+  /// If non-empty, override region with a connect string such as "localhost:9000"
+  // XXX perhaps instead take a URL like "http://localhost:9000"?
+  std::string endpoint_override;
+  /// S3 connection transport, default "https"
+  std::string scheme = "https";
+};

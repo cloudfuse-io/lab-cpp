@@ -27,23 +27,12 @@
 
 #include "async_queue.h"
 #include "metrics.h"
+#include "sdk-init.h"
 
 #if !defined(BUZZ_STATUS_ABORT)
 #define BUZZ_STATUS_ABORT 1
 const Status STATUS_ABORTED(StatusCode::UnknownError, "query_aborted");
 #endif
-
-/// Options for the S3FileSystem implementation.
-struct S3Options {
-  /// AWS region to connect to (default "us-east-1")
-  std::string region = "us-east-1";
-
-  /// If non-empty, override region with a connect string such as "localhost:9000"
-  // XXX perhaps instead take a URL like "http://localhost:9000"?
-  std::string endpoint_override;
-  /// S3 connection transport, default "https"
-  std::string scheme = "https";
-};
 
 struct S3Path {
   std::string bucket;
@@ -67,7 +56,7 @@ class Downloader {
   /// The Synchronizer allows the downloader to notify the dispatcher when a new
   /// download is ready
   Downloader(std::shared_ptr<Synchronizer> synchronizer, int pool_size,
-             std::shared_ptr<util::MetricsManager> metrics, const S3Options& options);
+             std::shared_ptr<util::MetricsManager> metrics, const SdkOptions& options);
 
   /// max_init_count should be <= than pool_size
   /// TODO: if called again before previous init complete, behaviour is undefined

@@ -15,10 +15,18 @@ variable "git_revision" {
 
 provider "aws" {
   profile = var.profile
-  version = "2.45.0"
+  version = "2.70.0"
   region  = module.env.region_name
 }
 
 module "env" {
   source = "./env"
 }
+
+provider "http" {}
+
+data "http" "icanhazip" {
+   url = "http://icanhazip.com"
+}
+
+provider "null" {}

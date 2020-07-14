@@ -1,7 +1,5 @@
 FROM ubuntu:18.04
 
-# RUN apk add --update zlib-dev curl-dev openssl-dev
-
 ARG BUILD_FILE
 ARG BUILD_TYPE=static
 
@@ -21,7 +19,7 @@ ARG BUILD_TYPE=static
 
 RUN apt-get update -y -q \
   && apt-get install -y -q \
-  libssl-dev \
+  libcurl4-openssl-dev \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 

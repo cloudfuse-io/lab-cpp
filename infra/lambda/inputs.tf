@@ -17,6 +17,14 @@ variable "timeout" {}
 
 variable "runtime" {}
 
+variable "vpc_id" {
+  default = ""
+}
+
+variable "subnets" {
+  default = []
+}
+
 variable "additional_policies" {
   type    = list
   default = []

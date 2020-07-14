@@ -1,6 +1,7 @@
-GIT_REVISION=`git rev-parse --short HEAD``git diff --quiet HEAD -- || echo "-dirty"`
+GIT_REVISION = `git rev-parse --short HEAD``git diff --quiet HEAD -- || echo "-dirty"`
 PROFILE = $(eval PROFILE := $(shell bash -c 'read -p "Profile: " input; echo $$input'))$(PROFILE)
 STAGE = $(eval STAGE := $(shell bash -c 'read -p "Stage: " input; echo $$input'))$(STAGE)
+ACCOUNT_ID = $(eval ACCOUNT_ID := $(aws sts get-caller-identity --profile=${PROFILE} --query 'Account' --output text))$(ACCOUNT_ID)
 SHELL := /bin/bash # Use bash syntax
 
 ## global commands
@@ -15,6 +16,11 @@ bin-folder:
 	@mkdir -p bin/build-amznlinux1
 	@mkdir -p bin/build-ubuntu
 	# @mkdir -p bin/build-bench
+
+# requires with AWS CLI v2
+docker-login:
+	aws ecr get-login-password --region "eu-west-1" --profile=${PROFILE} | \
+	docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.eu-west-1.amazonaws.com"
 
 ## build commands
 build-lambda-runtime-cpp:
@@ -175,10 +181,12 @@ bash-inside-emulator:
 
 ## local hive run commands
 
-run-hive-local: build-hive
+dockerify-hive: build-hive
 	docker-compose \
 		-f docker/ubuntu-run-cpp/docker-compose.yaml \
 		build
+
+run-hive-local: dockerify-hive
 	docker-compose \
 		-f docker/ubuntu-run-cpp/docker-compose.yaml \
 		up --abort-on-container-exit
@@ -190,10 +198,16 @@ run-local-flight-server:
 	BUILD_FILE=flight-server \
 	make run-hive-local
 
+run-local-query-bw-scheduler:
+	BUILD_FILE=query-bw-scheduler \
+	AWS_PROFILE=${AWS_PROFILE} \
+	IMAGE_TAG="${GIT_REVISION}" \
+	make run-hive-local
+
 ## deployment commands
 
 # this defaults the file deployed to the generic playground
-GEN_PLAY_FILE ?= simd-support
+GEN_PLAY_FILE ?= query-bandwidth2
 
 init-dev:
 	cd infra; terraform workspace select dev
@@ -243,7 +257,7 @@ deploy-bench-playground: deploy-playground bench-playground
 # | grep '^{.*}$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .CONTAINER_RUNS]|@csv'
 
 force-deploy-dev:
-	BUILD_FILE=query-bandwidth make package-bee
+	BUILD_FILE=query-bw-scheduler IMAGE_TAG="${GIT_REVISION}" make dockerify-hive
 	BUILD_FILE=query-bandwidth2 make package-bee
 	BUILD_FILE=mem-bandwidth make package-bee
 	BUILD_FILE=${GEN_PLAY_FILE} make package-bee

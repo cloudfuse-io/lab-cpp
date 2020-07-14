@@ -2,17 +2,20 @@ version: '2.4'
 
 services:
   server-runtime:
+    image: "buzz-hive-${BUILD_FILE}:${IMAGE_TAG}"
     build:
       context: ../../bin/build-ubuntu/executables
       dockerfile: ../../../docker/ubuntu-run-cpp/Dockerfile
       args:
         BUILD_FILE: ${BUILD_FILE}
     volumes:
-      - ~/.aws:/root/.aws
+      - ~/.aws:/home/.aws
     cpus: 4
     mem_limit: 4096M
     environment:
       IS_LOCAL: "true"
+      AWS_SHARED_CREDENTIALS_FILE: /home/.aws/credentials
+      AWS_PROFILE: ${AWS_PROFILE}
     ports:
       - "8081:80"
 

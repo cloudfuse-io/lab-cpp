@@ -17,7 +17,6 @@
 
 #include "downloader.h"
 
-#include <arrow/result.h>
 #include <aws/core/client/RetryStrategy.h>
 #include <aws/core/utils/stream/PreallocatedStreamBuf.h>
 #include <aws/s3/model/DeleteObjectRequest.h>
@@ -123,7 +122,7 @@ Status GetObjectRange(std::shared_ptr<Aws::S3::S3Client> client, const S3Path& p
 
 Downloader::Downloader(std::shared_ptr<Synchronizer> synchronizer, int pool_size,
                        std::shared_ptr<util::MetricsManager> metrics,
-                       const S3Options& options)
+                       const SdkOptions& options)
     : queue_(synchronizer, pool_size),
       metrics_manager_(metrics),
       pool_size_(pool_size),

@@ -42,12 +42,13 @@ add_subdirectory(util)
 add_subdirectory(aws)
 
 # TODO remove following when s3fs fully replaced
-find_package(AWSSDK COMPONENTS config s3 transfer)
+find_package(AWSSDK COMPONENTS config s3 transfer lambda)
 message(STATUS "Found AWS SDK libraries: ${AWSSDK_LINK_LIBRARIES}")
 target_link_libraries(arrow_${BUZZ_BUILD_TYPE} PRIVATE ${AWSSDK_LINK_LIBRARIES})
 
 # we build exec files 1 by 1, acording to the BUZZ_BUILD_FILE var
-if("${BUZZ_BUILD_FILE}" STREQUAL "flight-server")
+set(HIVE_FILES flight-server query-bw-scheduler)
+if("${BUZZ_BUILD_FILE}" IN_LIST HIVE_FILES)
   set(BUZZ_TARGET "buzz-${BUZZ_BUILD_FILE}-${BUZZ_BUILD_TYPE}")
 
   MESSAGE(STATUS "Hive packaging ${BUZZ_BUILD_FILE}.cc as ${BUZZ_TARGET}")
@@ -55,6 +56,9 @@ if("${BUZZ_BUILD_FILE}" STREQUAL "flight-server")
   add_executable(${BUZZ_TARGET} playground/${BUZZ_BUILD_FILE}.cc)
   list(APPEND BUZZ_ALL ${BUZZ_TARGET})
 
+  target_link_libraries(${BUZZ_TARGET}
+    PRIVATE buzz-aws buzz-util
+  )
   target_link_arrow(${BUZZ_TARGET})
 elseif(BUZZ_BUILD_FILE)
   find_package(aws-lambda-runtime)

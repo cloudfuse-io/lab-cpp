@@ -1,10 +1,10 @@
 
 #include <aws/lambda-runtime/runtime.h>
 
-#include "sdk-init.h"
 #include "bootstrap.h"
 #include "downloader.h"
 #include "logger.h"
+#include "sdk-init.h"
 #include "toolbox.h"
 
 static int NB_CHUNCK = util::getenv_int("NB_CHUNCK", 12);
@@ -16,7 +16,7 @@ static util::Logger LOGGER = util::Logger(IS_LOCAL);
 static int64_t CONTAINER_RUNS = 0;
 
 static aws::lambda_runtime::invocation_response my_handler(
-    const aws::lambda_runtime::invocation_request& req, const S3Options& options) {
+    const aws::lambda_runtime::invocation_request& req, const SdkOptions& options) {
   CONTAINER_RUNS++;
   auto synchronizer = std::make_shared<Synchronizer>();
   auto metrics_manager = std::make_shared<util::MetricsManager>(LOGGER);
@@ -80,7 +80,7 @@ static aws::lambda_runtime::invocation_response my_handler(
 int main() {
   InitializeAwsSdk(AwsSdkLogLevel::Off);
   // init s3 client
-  S3Options options;
+  SdkOptions options;
   options.region = "eu-west-1";
   if (IS_LOCAL) {
     options.endpoint_override = "minio:9000";

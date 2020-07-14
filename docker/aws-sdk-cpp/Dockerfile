@@ -8,7 +8,7 @@ RUN git clone -b ${SDK_VERSION} --depth 1 https://github.com/aws/aws-sdk-cpp.git
 RUN mkdir -p /source/build && \
   cd /source/build && \
   cmake .. \
-  -DBUILD_ONLY="config;s3;transfer" \
+  -DBUILD_ONLY="config;s3;transfer;lambda" \
   -DBUILD_SHARED_LIBS=OFF \
   -DCMAKE_CXX_FLAGS="-w" \
   -DCMAKE_BUILD_TYPE=Release \

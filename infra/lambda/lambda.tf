@@ -17,6 +17,14 @@ resource "aws_lambda_function" "lambda" {
     )
   }
 
+  dynamic "vpc_config" {
+    for_each = var.vpc_id == "" ? [] : [1]
+    content {
+      security_group_ids = [aws_security_group.lambda_sg.id]
+      subnet_ids         = var.subnets
+    }
+  }
+
   tags = module.env.tags
 }
 
@@ -31,4 +39,21 @@ resource "aws_cloudwatch_log_group" "lambda_log_group" {
   name              = "/aws/lambda/${aws_lambda_function.lambda.function_name}"
   retention_in_days = 14
   tags              = module.env.tags
+}
+
+resource "aws_security_group" "lambda_sg" {
+  count = var.vpc_id == "" ? 0 : 1
+
+  name        = "${module.env.tags["module"]}-${var.function_base_name}-${module.env.stage}"
+  description = "allow outbound access"
+  vpc_id      = var.vpc_id
+
+  egress {
+    protocol    = "-1"
+    from_port   = 0
+    to_port     = 0
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = module.env.tags
 }

@@ -23,6 +23,8 @@
 
 #include <iostream>
 
+#include "toolbox.h"
+
 namespace util {
 using namespace rapidjson;
 
@@ -35,7 +37,7 @@ class LogEntry {
   friend class Logger;
 
  private:
-  LogEntry(const char* msg, bool is_local);
+  LogEntry(const char* msg, time::time_point timestamp, bool is_local);
   StringBuffer buffer_;
   Writer<StringBuffer> writer_;
   bool is_local_;
@@ -44,7 +46,9 @@ class LogEntry {
 class Logger {
  public:
   Logger(bool is_local);
-  LogEntry NewEntry(const char* msg) const { return LogEntry(msg, is_local_); }
+  LogEntry NewEntry(const char* msg, time::time_point timestamp = time::now()) const {
+    return LogEntry(msg, timestamp, is_local_);
+  }
 
  private:
   bool is_local_;

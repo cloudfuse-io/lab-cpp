@@ -29,6 +29,8 @@ static void LogAndSwallowHandler(int signal) {
   }
 }
 
+/// This http client factory ignores maxConnections as pool is specific to a domain
+/// (in order to better re-use ssl connections) and not by client
 std::shared_ptr<Aws::Http::HttpClient> CustomHttpClientFactory::CreateHttpClient(
     const Aws::Client::ClientConfiguration& clientConfiguration) const {
   return Aws::MakeShared<Buzz::Http::CurlHttpClient>(HTTP_CLIENT_FACTORY_ALLOCATION_TAG,

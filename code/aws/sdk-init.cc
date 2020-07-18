@@ -50,7 +50,7 @@ void InitializeAwsSdk(const AwsSdkLogLevel& log_level) {
       LOG_LEVEL_CASE(Debug)
       LOG_LEVEL_CASE(Trace)
       default:
-        aws_log_level = Aws::Utils::Logging::LogLevel::Warn;
+        aws_log_level = Aws::Utils::Logging::LogLevel::Off;
     }
     aws_options.loggingOptions.logLevel = aws_log_level;
     // By default the AWS SDK logs to files, log to console instead

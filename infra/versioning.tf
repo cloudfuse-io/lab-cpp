@@ -15,5 +15,5 @@ resource "aws_resourcegroups_group" "resourcegroup" {
 JSON
   }
 
-  description = "git_revision ${var.git_revision}" 
+  description = "git_revision ${var.git_revision}"
 }

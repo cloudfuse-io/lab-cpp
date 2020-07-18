@@ -33,7 +33,7 @@ static aws::lambda_runtime::invocation_response my_handler(
     inits_completed += results.size();
   }
   // start download
-  auto start_time = std::chrono::high_resolution_clock::now();
+  auto start_time = util::time::now();
   for (int i = 0; i < NB_CHUNCK; i++) {
     downloader.ScheduleDownload({i * CHUNK_SIZE,
                                  (i + 1) * CHUNK_SIZE - 1,
@@ -58,9 +58,10 @@ static aws::lambda_runtime::invocation_response my_handler(
       downloaded_bytes += response.raw_data->size();
     }
   }
-  auto end_time = std::chrono::high_resolution_clock::now();
+  auto end_time = util::time::now();
   auto total_duration = util::get_duration_ms(start_time, end_time);
   metrics_manager->NewEvent("handler_end");
+  // logging all results
   metrics_manager->Print();
   auto entry = LOGGER.NewEntry("query_bandwidth2");
   entry.IntField("CONTAINER_RUNS", CONTAINER_RUNS);

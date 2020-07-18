@@ -17,6 +17,7 @@
 
 #include "downloader.h"
 
+#include <aws/core/client/DefaultRetryStrategy.h>
 #include <aws/core/client/RetryStrategy.h>
 #include <aws/core/utils/stream/PreallocatedStreamBuf.h>
 #include <aws/s3/model/DeleteObjectRequest.h>
@@ -27,49 +28,6 @@
 #include "toolbox.h"
 
 namespace {
-template <typename Error>
-inline bool IsConnectError(const Aws::Client::AWSError<Error>& error) {
-  if (error.ShouldRetry()) {
-    return true;
-  }
-  // Sometimes Minio may fail with a 503 error
-  // (exception name: XMinioServerNotInitialized,
-  //  message: "Server not initialized, please try again")
-  if (error.GetExceptionName() == "XMinioServerNotInitialized") {
-    return true;
-  }
-  return false;
-}
-
-class ConnectRetryStrategy : public Aws::Client::RetryStrategy {
- public:
-  static const int32_t kDefaultRetryInterval = 200;     /* milliseconds */
-  static const int32_t kDefaultMaxRetryDuration = 6000; /* milliseconds */
-
-  explicit ConnectRetryStrategy(int32_t retry_interval = kDefaultRetryInterval,
-                                int32_t max_retry_duration = kDefaultMaxRetryDuration)
-      : retry_interval_(retry_interval), max_retry_duration_(max_retry_duration) {}
-
-  bool ShouldRetry(const Aws::Client::AWSError<Aws::Client::CoreErrors>& error,
-                   long attempted_retries) const override {  // NOLINT
-    if (!IsConnectError(error)) {
-      // Not a connect error, don't retry
-      return false;
-    }
-    return attempted_retries * retry_interval_ < max_retry_duration_;
-  }
-
-  long CalculateDelayBeforeNextRetry(  // NOLINT
-      const Aws::Client::AWSError<Aws::Client::CoreErrors>& error,
-      long attempted_retries) const override {  // NOLINT
-    return retry_interval_;
-  }
-
- protected:
-  int32_t retry_interval_;
-  int32_t max_retry_duration_;
-};
-
 std::string FormatRange(int64_t start, int64_t length) {
   // Format a HTTP range header value
   std::stringstream ss;
@@ -120,6 +78,20 @@ Status GetObjectRange(std::shared_ptr<Aws::S3::S3Client> client, const S3Path& p
 }
 }  // namespace
 
+Aws::Client::ClientConfiguration common_config(const SdkOptions& options) {
+  Aws::Client::ClientConfiguration conf;
+  conf.region = Aws::Utils::StringUtils::to_string(options.region);
+  conf.endpointOverride = Aws::Utils::StringUtils::to_string(options.endpoint_override);
+  if (options.scheme == "http") {
+    conf.scheme = Aws::Http::Scheme::HTTP;
+  } else if (options.scheme == "https") {
+    conf.scheme = Aws::Http::Scheme::HTTPS;
+  } else {
+    throw "Invalid S3 connection scheme '", options.scheme, "'";
+  }
+  return conf;
+}
+
 Downloader::Downloader(std::shared_ptr<Synchronizer> synchronizer, int pool_size,
                        std::shared_ptr<util::MetricsManager> metrics,
                        const SdkOptions& options)
@@ -127,21 +99,19 @@ Downloader::Downloader(std::shared_ptr<Synchronizer> synchronizer, int pool_size
       metrics_manager_(metrics),
       pool_size_(pool_size),
       synchronizer_(synchronizer) {
-  Aws::Client::ClientConfiguration client_config_;
-  client_config_.region = Aws::Utils::StringUtils::to_string(options.region);
-  client_config_.endpointOverride =
-      Aws::Utils::StringUtils::to_string(options.endpoint_override);
-  if (options.scheme == "http") {
-    client_config_.scheme = Aws::Http::Scheme::HTTP;
-  } else if (options.scheme == "https") {
-    client_config_.scheme = Aws::Http::Scheme::HTTPS;
-  } else {
-    throw "Invalid S3 connection scheme '", options.scheme, "'";
-  }
-  client_config_.retryStrategy = std::make_shared<ConnectRetryStrategy>();
   bool use_virtual_addressing = options.endpoint_override.empty();
-  client_.reset(new Aws::S3::S3Client(
-      client_config_, Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
+  // DL CLIENT FOR DOWNLOADS
+  Aws::Client::ClientConfiguration dl_config_ = common_config(options);
+  dl_config_.retryStrategy = std::make_shared<Aws::Client::DefaultRetryStrategy>(3);
+  dl_client_.reset(new Aws::S3::S3Client(
+      dl_config_, Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
+      use_virtual_addressing));
+  // INIT CLIENT FOR INIT CONNECTION OPS, no retry shorter timeout
+  Aws::Client::ClientConfiguration init_config_ = common_config(options);
+  init_config_.retryStrategy = std::make_shared<Aws::Client::DefaultRetryStrategy>(0);
+  init_config_.httpRequestTimeoutMs = 500;  // timeout trashes the connection
+  init_client_.reset(new Aws::S3::S3Client(
+      init_config_, Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
       use_virtual_addressing));
 }
 
@@ -171,10 +141,10 @@ void Downloader::InitConnections(std::string bucket, int max_init_count) {
       // max_init_count initializations
       util::time::time_point blocking_start_time;
       util::time::time_point blocking_end_time;
-      req.SetDataReceivedEventHandler([this, max_init_count, &blocking_start_time,
-                                       &blocking_end_time](const Aws::Http::HttpRequest*,
-                                                           const Aws::Http::HttpResponse*,
-                                                           long long) -> void {
+      auto sync_callback = [this, max_init_count, &blocking_start_time,
+                            &blocking_end_time](const Aws::Http::HttpRequest*,
+                                                const Aws::Http::HttpResponse*,
+                                                long long) -> void {
         if (blocking_start_time.time_since_epoch().count()) {
           // the callback was already called for this init
           return;
@@ -190,8 +160,15 @@ void Downloader::InitConnections(std::string bucket, int max_init_count) {
           init_interruption_cv_.notify_all();
         }
         blocking_end_time = util::time::now();
-      });
-      client_->DeleteObject(req);
+      };
+      req.SetDataReceivedEventHandler(sync_callback);
+      init_client_->DeleteObject(req);
+      if (!blocking_start_time.time_since_epoch().count() &&
+          !blocking_end_time.time_since_epoch().count()) {
+        // sync_callback never called, likely because of timeout
+        // TODO no need to wait in that case
+        sync_callback(nullptr, nullptr, 0);
+      }
       // if resolution_time_ms << 0 it means that the callback was never called
       metrics_manager_->NewInitConnection(
           util::get_duration_ms(start, util::time::now()),
@@ -213,12 +190,12 @@ void Downloader::ScheduleDownload(DownloadRequest request) {
     int64_t nbytes = request.range_end - request.range_start + 1;
     ARROW_ASSIGN_OR_RAISE(auto buf, arrow::AllocateResizableBuffer(nbytes));
     auto start = util::time::now();
-    this->metrics_manager_->NewEvent("get_obj_start");
-    RETURN_NOT_OK(GetObjectRange(this->client_, request.path, request.range_start, nbytes,
-                                 buf->mutable_data(), this->metrics_manager_));
-    this->metrics_manager_->NewDownload(util::get_duration_ms(start, util::time::now()),
-                                        nbytes);
-    this->metrics_manager_->NewEvent("get_obj_end");
+    metrics_manager_->NewEvent("get_obj_start");
+    RETURN_NOT_OK(GetObjectRange(dl_client_, request.path, request.range_start, nbytes,
+                                 buf->mutable_data(), metrics_manager_));
+    metrics_manager_->NewDownload(util::get_duration_ms(start, util::time::now()),
+                                  nbytes);
+    metrics_manager_->NewEvent("get_obj_end");
 
     return DownloadResponse{request, std::shared_ptr<arrow::Buffer>(std::move(buf))};
   });

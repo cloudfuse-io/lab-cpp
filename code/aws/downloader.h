@@ -72,7 +72,8 @@ class Downloader {
   int pool_size_;
   std::shared_ptr<Synchronizer> synchronizer_;
   AsyncQueue<DownloadResponse> queue_;
-  std::shared_ptr<Aws::S3::S3Client> client_;
+  std::shared_ptr<Aws::S3::S3Client> dl_client_;
+  std::shared_ptr<Aws::S3::S3Client> init_client_;
   std::shared_ptr<util::MetricsManager> metrics_manager_;
   int init_counter_;
   std::condition_variable init_interruption_cv_;

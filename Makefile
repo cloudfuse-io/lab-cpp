@@ -1,8 +1,8 @@
 GIT_REVISION = `git rev-parse --short HEAD``git diff --quiet HEAD -- || echo "-dirty"`
 PROFILE = $(eval PROFILE := $(shell bash -c 'read -p "Profile: " input; echo $$input'))$(PROFILE)
 STAGE = $(eval STAGE := $(shell bash -c 'read -p "Stage: " input; echo $$input'))$(STAGE)
-ACCOUNT_ID = $(eval ACCOUNT_ID := $(aws sts get-caller-identity --profile=${PROFILE} --query 'Account' --output text))$(ACCOUNT_ID)
 SHELL := /bin/bash # Use bash syntax
+REGION := eu-west-1
 
 ## global commands
 
@@ -19,8 +19,9 @@ bin-folder:
 
 # requires with AWS CLI v2
 docker-login:
-	aws ecr get-login-password --region "eu-west-1" --profile=${PROFILE} | \
-	docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.eu-west-1.amazonaws.com"
+	aws ecr get-login-password --region "${REGION}" --profile=${PROFILE} | \
+	docker login --username AWS --password-stdin \
+		"$(shell aws sts get-caller-identity --profile=${PROFILE} --query 'Account' --output text).dkr.ecr.${REGION}.amazonaws.com"
 
 ## build commands
 build-lambda-runtime-cpp:
@@ -51,21 +52,27 @@ arrow-cpp-bee-build-image: bin-folder build-lambda-runtime-cpp
 # 	docker build -t buzz-arrow-cpp-bench -f docker/arrow-cpp/benchmarks.Dockerfile .
 # 	docker run --rm -it -v ${CURDIR}/bin/build-bench:/tmp/ buzz-arrow-cpp-bench
 
-build-bee: arrow-cpp-bee-build-image
+bin/build-amznlinux1/executables/buzz-%-static: arrow-cpp-bee-build-image
 	docker run --rm \
 		-v ${CURDIR}/bin/build-amznlinux1:/build \
-		-e BUILD_FILE=${BUILD_FILE} \
+		-e BUILD_FILE=$* \
 		-e BUILD_TYPE=static \
 		buzz-arrow-cpp-build-bee \
 		build
 
-package-bee: arrow-cpp-bee-build-image
+bin/build-amznlinux1/executables/buzz-%-static.zip: bin/build-amznlinux1/executables/buzz-%-static
 	docker run --rm \
-		-v ${CURDIR}/bin/build-amznlinux1:/build \
-		-e BUILD_FILE=${BUILD_FILE} \
+		-v ${CURDIR}/bin/build-amznlinux1/executables:/build/executables \
+		-e BUILD_FILE=$* \
 		-e BUILD_TYPE=static \
 		buzz-arrow-cpp-build-bee \
-		build package
+		package
+
+build-bee:
+	make bin/build-amznlinux1/executables/buzz-${BUILD_FILE}-static
+
+package-bee:
+	make bin/build-amznlinux1/executables/buzz-${BUILD_FILE}-static.zip
 
 build-hive: arrow-cpp-hive-build-image
 	docker run --rm \
@@ -81,7 +88,7 @@ test: arrow-cpp-bee-build-image
 		-e BUILD_FILE=${BUILD_FILE} \
 		-e BUILD_TYPE=static \
 		buzz-arrow-cpp-build-bee \
-		build test
+		test
 
 ## local bee run commands
 
@@ -204,16 +211,12 @@ run-local-query-bw-scheduler:
 	IMAGE_TAG="${GIT_REVISION}" \
 	make run-hive-local
 
-## deployment commands
+## bee deployment commands
 
 # this defaults the file deployed to the generic playground
 GEN_PLAY_FILE ?= query-bandwidth2
 
-init-dev:
-	cd infra; terraform workspace select dev
-	cd infra; terraform init
-
-deploy-playground:
+deploy-bee:
 	BUILD_FILE=${GEN_PLAY_FILE} make package-bee
 	@cd infra; terraform workspace select dev
 	cd infra; terraform apply \
@@ -223,38 +226,74 @@ deploy-playground:
 		--var git_revision=${GIT_REVISION} \
 		--var generic_playground_file=${GEN_PLAY_FILE}
 
-run-playground:
+run-bee:
 	@aws lambda invoke \
 		--function-name buzz-cpp-generic-playground-static-dev \
 		--log-type Tail \
-		--region eu-west-1 \
+		--region ${REGION} \
 		--profile bbdev \
 		--query 'LogResult' \
 		--output text \
 		/dev/null | base64 -d
 
-deploy-run-playground: deploy-playground
+deploy-run-bee: deploy-bee
 	sleep 2
-	make run-playground
+	make run-bee
 
-bench-playground:
+bench-bee:
 	@# change the unused param "handler" to reset lambda state
-	number=1 ; while [[ $$number -le 25 ]] ; do \
+	number=1 ; while [[ $$number -le 20 ]] ; do \
 		aws lambda update-function-configuration \
 			--function-name buzz-cpp-generic-playground-static-dev \
 			--handler "N/A-$$number" \
-			--region eu-west-1 \
+			--region ${REGION} \
 			--profile bbdev  > /dev/null 2>&1; \
-		make run-playground 2>&- | grep '^{.*}$$'; \
-		make run-playground 2>&- | grep '^{.*}$$'; \
-		make run-playground 2>&- | grep '^{.*}$$'; \
-		make run-playground 2>&- | grep '^{.*}$$'; \
+		make run-bee 2>&- | grep '^{.*}$$'; \
+		make run-bee 2>&- | grep '^{.*}$$'; \
+		make run-bee 2>&- | grep '^{.*}$$'; \
+		make run-bee 2>&- | grep '^{.*}$$'; \
 		((number = number + 1)) ; \
 	done
 
-deploy-bench-playground: deploy-playground bench-playground 
+deploy-bench-bee: deploy-bee bench-bee 
 
-# | grep '^{.*}$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .CONTAINER_RUNS]|@csv'
+# | grep '^{.*query_bandwidth2.*}$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .CONTAINER_RUNS]|@csv'
+
+## hive deployment commands
+
+# deploy-hive:
+# 	BUILD_FILE=query-bw-scheduler IMAGE_TAG="${GIT_REVISION}" make dockerify-hive
+# 	@cd infra; terraform workspace select dev
+# 	cd infra; terraform apply \
+# 		-target=module.query-bw-scheduler-fargate \
+# 		-auto-approve \
+# 		--var profile=bbdev \
+# 		--var git_revision=${GIT_REVISION} \
+# 		--var generic_playground_file=${GEN_PLAY_FILE}
+
+run-hive:
+	@aws ecs run-task \
+		--cluster buzz-cpp-cluster-dev \
+		--count 1 \
+		--region ${REGION} \
+		--profile bbdev \
+		--task-definition query-bw-scheduler-static-dev \
+		--query 'failures' \
+		--network-configuration "awsvpcConfiguration={\
+			subnets=[subnet-04781218a08ce132b,subnet-04781218a08ce132b,subnet-04781218a08ce132b],\
+			securityGroups=[sg-05c959b2e4865eb48],\
+			assignPublicIp=ENABLED\
+			}"
+
+# deploy-run-hive: deploy-hive
+# 	sleep 2
+# 	make run-hive
+
+## deploy all commands
+
+init-dev:
+	cd infra; terraform workspace select dev
+	cd infra; terraform init
 
 force-deploy-dev:
 	BUILD_FILE=query-bw-scheduler IMAGE_TAG="${GIT_REVISION}" make dockerify-hive

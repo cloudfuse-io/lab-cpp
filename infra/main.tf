@@ -26,7 +26,7 @@ module "env" {
 provider "http" {}
 
 data "http" "icanhazip" {
-   url = "http://icanhazip.com"
+  url = "http://icanhazip.com"
 }
 
 provider "null" {}

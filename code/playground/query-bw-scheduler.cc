@@ -7,6 +7,10 @@
 #include "toolbox.h"
 
 static bool IS_LOCAL = false;  // util::getenv_bool("IS_LOCAL", false);
+static int NB_PARALLEL = util::getenv_int("NB_PARALLEL", 1);
+static int NB_INVOKE = util::getenv_int("NB_INVOKE", 1);
+static const char* BEE_FUNCTION_NAME =
+    util::getenv("BEE_FUNCTION_NAME", "buzz-cpp-generic-playground-static-dev");
 
 namespace {
 class ConnectRetryStrategy : public Aws::Client::RetryStrategy {
@@ -86,20 +90,24 @@ void execute() {
     options.scheme = "http";
   }
   auto synchronizer = std::make_shared<Synchronizer>();
-  Fume fume{synchronizer, 8, options};
-  int nb_invoke = 1;
-  for (int i = 0; i < nb_invoke; i++) {
-    fume.Invoke("buzz-cpp-generic-playground-static-dev");
+  Fume fume{synchronizer, NB_PARALLEL, options};
+  for (int i = 0; i < NB_INVOKE; i++) {
+    fume.Invoke(BEE_FUNCTION_NAME);
   }
   int invokes_completed = 0;
-  while (invokes_completed < nb_invoke) {
+  int invokes_successful = 0;
+  while (invokes_completed < NB_INVOKE) {
     synchronizer->wait();
     auto results = fume.ProcessResponses();
     invokes_completed += results.size();
     for (auto& res : results) {
-      std::cout << "Status:" << res.ok() << std::endl;
+      if (res.ok()) {
+        invokes_successful++;
+      }
     }
   }
+  std::cout << "invokes_scheduled=" << NB_INVOKE << std::endl;
+  std::cout << "invokes_successful=" << invokes_successful << std::endl;
 }
 
 int main() {

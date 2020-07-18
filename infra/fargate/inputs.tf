@@ -1,5 +1,5 @@
 module "env" {
-    source = "../env"
+  source = "../env"
 }
 
 variable "task_base_name" {}
@@ -23,3 +23,16 @@ variable "docker_image" {}
 variable "subnets" {}
 
 variable "local_ip" {}
+
+# forces dependency on image push
+variable "depends_on_image_push" {
+  default = ""
+}
+resource "null_resource" "print_depends_on_image_push" {
+  triggers = {
+    always_run = "${timestamp()}"
+  }
+  provisioner "local-exec" {
+    command = "echo ${var.depends_on_image_push}"
+  }
+}

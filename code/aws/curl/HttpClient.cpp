@@ -17,6 +17,8 @@
 #include <algorithm>
 #include <cassert>
 
+#include "logger.h"
+
 namespace Buzz {
 namespace Http {
 
@@ -293,10 +295,9 @@ int CurlDebugCallback(CURL* handle, curl_infotype type, char* data, size_t size,
 CurlHttpClient::CurlHttpClient(const Aws::Client::ClientConfiguration& clientConfig)
     : Base(),
       m_curlHandleContainer(
-          clientConfig.maxConnections, clientConfig.httpRequestTimeoutMs,
-          clientConfig.connectTimeoutMs, clientConfig.enableTcpKeepAlive,
-          clientConfig.tcpKeepAliveIntervalMs, clientConfig.requestTimeoutMs,
-          clientConfig.lowSpeedLimit),
+          clientConfig.httpRequestTimeoutMs, clientConfig.connectTimeoutMs,
+          clientConfig.enableTcpKeepAlive, clientConfig.tcpKeepAliveIntervalMs,
+          clientConfig.requestTimeoutMs, clientConfig.lowSpeedLimit),
       m_isUsingProxy(!clientConfig.proxyHost.empty()),
       m_proxyUserName(clientConfig.proxyUserName),
       m_proxyPassword(clientConfig.proxyPassword),
@@ -368,7 +369,7 @@ std::shared_ptr<Aws::Http::HttpResponse> CurlHttpClient::MakeRequest(
     headers = curl_slist_append(headers, "Expect:");
   }
 
-  CURL* connectionHandle = m_curlHandleContainer.AcquireCurlHandle();
+  CURL* connectionHandle = m_curlHandleContainer.AcquireCurlHandle(uri.GetAuthority());
 
   if (connectionHandle) {
     AWS_LOGSTREAM_DEBUG(CURL_HTTP_CLIENT_TAG,
@@ -528,31 +529,41 @@ std::shared_ptr<Aws::Http::HttpResponse> CurlHttpClient::MakeRequest(
                           "Releasing curl handle " << connectionHandle);
     }
 
-    double timep;
+    double dns_time = 0;
     CURLcode ret = curl_easy_getinfo(connectionHandle, CURLINFO_NAMELOOKUP_TIME,
-                                     &timep);  // DNS Resolve Latency, seconds.
+                                     &dns_time);  // DNS Resolve Latency, seconds.
     if (ret == CURLE_OK) {
-      request->AddRequestMetric(Aws::Monitoring::GetHttpClientMetricNameByType(
-                                    Aws::Monitoring::HttpClientMetricsType::DnsLatency),
-                                static_cast<int64_t>(timep * 1000));  // to milliseconds
+      request->AddRequestMetric(
+          Aws::Monitoring::GetHttpClientMetricNameByType(
+              Aws::Monitoring::HttpClientMetricsType::DnsLatency),
+          static_cast<int64_t>(dns_time * 1000));  // to milliseconds
     }
 
+    double starttransfer_time = 0;
     ret = curl_easy_getinfo(connectionHandle, CURLINFO_STARTTRANSFER_TIME,
-                            &timep);  // Connect Latency
+                            &starttransfer_time);  // Connect Latency
     if (ret == CURLE_OK) {
       request->AddRequestMetric(
           Aws::Monitoring::GetHttpClientMetricNameByType(
               Aws::Monitoring::HttpClientMetricsType::ConnectLatency),
-          static_cast<int64_t>(timep * 1000));
+          static_cast<int64_t>(starttransfer_time * 1000));
     }
 
+    double appconnect_time = 0;
     ret = curl_easy_getinfo(connectionHandle, CURLINFO_APPCONNECT_TIME,
-                            &timep);  // Ssl Latency
+                            &appconnect_time);  // Ssl Latency
     if (ret == CURLE_OK) {
       request->AddRequestMetric(Aws::Monitoring::GetHttpClientMetricNameByType(
                                     Aws::Monitoring::HttpClientMetricsType::SslLatency),
-                                static_cast<int64_t>(timep * 1000));
+                                static_cast<int64_t>(appconnect_time * 1000));
     }
+
+    // std::stringstream ss;
+    // ss << "dns_time=" << static_cast<int64_t>(dns_time * 1000)
+    //    << ",starttransfer_time=" << static_cast<int64_t>(starttransfer_time * 1000)
+    //    << ",appconnect_time=" << static_cast<int64_t>(appconnect_time * 1000)
+    //    << std::endl;
+    // std::cout << ss.str();
 
     const char* ip = nullptr;
     auto curlGetInfoResult =
@@ -564,7 +575,7 @@ std::shared_ptr<Aws::Http::HttpResponse> CurlHttpClient::MakeRequest(
     if (curlResponseCode != CURLE_OK) {
       m_curlHandleContainer.DestroyCurlHandle(connectionHandle);
     } else {
-      m_curlHandleContainer.ReleaseCurlHandle(connectionHandle);
+      m_curlHandleContainer.ReleaseCurlHandle(uri.GetAuthority(), connectionHandle);
     }
     // go ahead and flush the response body stream
     response->GetResponseBody().flush();

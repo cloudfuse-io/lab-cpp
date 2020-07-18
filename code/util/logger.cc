@@ -31,12 +31,11 @@ Logger::Logger(bool is_local) : is_local_(is_local) {
   }
 }
 
-LogEntry::LogEntry(const char* msg, bool is_local)
+LogEntry::LogEntry(const char* msg, time::time_point timestamp, bool is_local)
     : buffer_(), writer_(buffer_), is_local_(is_local) {
   writer_.StartObject();
   writer_.Key("time");
-  auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(
-      std::chrono::system_clock::now());
+  auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(timestamp);
   auto datestring = arrow_vendored::date::format("%FT%T%z", now);
   writer_.String(datestring.data());
   writer_.Key("msg");

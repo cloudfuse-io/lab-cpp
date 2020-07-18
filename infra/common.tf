@@ -70,30 +70,30 @@ EOF
 
 #### ECS ####
 resource "aws_ecs_cluster" "ecs_cluster" {
-    name = "${module.env.tags["module"]}-cluster-${module.env.stage}"
-    capacity_providers = ["FARGATE"]
-    default_capacity_provider_strategy {
-        capacity_provider = "FARGATE"
-    }
-    setting {
-        name = "containerInsights"
-        value = "disabled"
-    }
-    tags = module.env.tags
+  name               = "${module.env.tags["module"]}-cluster-${module.env.stage}"
+  capacity_providers = ["FARGATE"]
+  default_capacity_provider_strategy {
+    capacity_provider = "FARGATE"
+  }
+  setting {
+    name  = "containerInsights"
+    value = "disabled"
+  }
+  tags = module.env.tags
 }
 
 #### NETWORK ####
 module "vpc" {
-    source = "github.com/terraform-aws-modules/terraform-aws-vpc"
+  source = "github.com/terraform-aws-modules/terraform-aws-vpc"
 
-    name = "${module.env.tags["module"]}-vpc-${module.env.stage}"
-    cidr = module.env.vpc_cidr
-    azs = module.env.vpc_azs
-    public_subnets = module.env.subnet_cidrs
+  name           = "${module.env.tags["module"]}-vpc-${module.env.stage}"
+  cidr           = module.env.vpc_cidr
+  azs            = module.env.vpc_azs
+  public_subnets = module.env.subnet_cidrs
 
-    enable_nat_gateway = false
-    enable_vpn_gateway = false
-    enable_s3_endpoint = true
+  enable_nat_gateway = false
+  enable_vpn_gateway = false
+  enable_s3_endpoint = true
 
-    tags = module.env.tags
+  tags = module.env.tags
 }

@@ -565,9 +565,6 @@ std::shared_ptr<Aws::Http::HttpResponse> CurlHttpClient::MakeRequest(
       entry.IntField("appconnect_ms", appconnect_time * 1000);
     }
 
-    entry.IntField("total_ms", util::get_duration_ms(start, util::time::now()));
-    entry.Log();
-
     const char* ip = nullptr;
     auto curlGetInfoResult =
         curl_easy_getinfo(connectionHandle, CURLINFO_PRIMARY_IP,
@@ -586,6 +583,9 @@ std::shared_ptr<Aws::Http::HttpResponse> CurlHttpClient::MakeRequest(
         Aws::Monitoring::GetHttpClientMetricNameByType(
             Aws::Monitoring::HttpClientMetricsType::RequestLatency),
         (Aws::Utils::DateTime::Now() - startTransmissionTime).count());
+
+    entry.IntField("total_ms", util::get_duration_ms(start, util::time::now()));
+    entry.Log();
   }
 
   if (headers) {

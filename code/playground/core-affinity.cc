@@ -28,7 +28,6 @@ constexpr double GIGA = 1024. * 1024. * 1024.;
 constexpr double ARRAY_BYTES = ARRAY_SIZE * sizeof(int64_t);
 static const int64_t CPU_FOR_SECOND_THREAD = util::getenv_int("CPU_FOR_SECOND_THREAD", 1);
 static bool IS_LOCAL = util::getenv_bool("IS_LOCAL", false);
-static util::Logger LOGGER = util::Logger(IS_LOCAL);
 
 static aws::lambda_runtime::invocation_response my_handler(
     aws::lambda_runtime::invocation_request const& req) {
@@ -57,7 +56,7 @@ static aws::lambda_runtime::invocation_response my_handler(
         auto agg_end_time = std::chrono::high_resolution_clock::now();
         auto agg_duration = util::get_duration_micro(agg_start_time, agg_end_time);
 
-        auto entry = LOGGER.NewEntry("mem_bandwidth");
+        auto entry = Buzz::logger::NewEntry("mem_bandwidth");
         entry.FloatField("agg_GBpS", ARRAY_BYTES / agg_duration * 1000. * 1000. / GIGA);
         entry.IntField("agg_ms", agg_duration / 1000);
         entry.IntField("computed_sum", sum);

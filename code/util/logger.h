@@ -17,41 +17,31 @@
 
 #pragma once
 
-#include <arrow/vendored/datetime.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
-#include <iostream>
-
 #include "toolbox.h"
 
-namespace util {
-using namespace rapidjson;
+namespace Buzz {
 
+namespace logger {
 class LogEntry {
  public:
   void StrField(const char* key, const char* value);
   void IntField(const char* key, int64_t value);
   void FloatField(const char* key, double value);
   void Log();
-  friend class Logger;
+  LogEntry(const char* msg, util::time::time_point timestamp);
 
  private:
-  LogEntry(const char* msg, time::time_point timestamp, bool is_local);
-  StringBuffer buffer_;
-  Writer<StringBuffer> writer_;
-  bool is_local_;
+  rapidjson::StringBuffer buffer_;
+  rapidjson::Writer<rapidjson::StringBuffer> writer_;
 };
 
-class Logger {
- public:
-  Logger(bool is_local);
-  LogEntry NewEntry(const char* msg, time::time_point timestamp = time::now()) const {
-    return LogEntry(msg, timestamp, is_local_);
-  }
+LogEntry NewEntry(const char* msg, util::time::time_point timestamp = util::time::now());
 
- private:
-  bool is_local_;
-};
+void IncrementRunCounter();
 
-}  // namespace util
+}  // namespace logger
+
+}  // namespace Buzz

@@ -60,9 +60,9 @@ Status GetObjectRange(std::shared_ptr<Aws::S3::S3Client> client, const S3Path& p
                       int64_t start, int64_t length, void* out,
                       std::shared_ptr<util::MetricsManager> metrics_manager) {
   Aws::S3::Model::GetObjectRequest req;
-  req.SetBucket(Aws::Utils::StringUtils::to_string(path.bucket));
-  req.SetKey(Aws::Utils::StringUtils::to_string(path.key));
-  req.SetRange(Aws::Utils::StringUtils::to_string(FormatRange(start, length)));
+  req.SetBucket(path.bucket);
+  req.SetKey(path.key);
+  req.SetRange(FormatRange(start, length));
   req.SetResponseStreamFactory(AwsWriteableStreamFactory(out, length));
   auto object_outcome = client->GetObject(req);
   if (!object_outcome.IsSuccess()) {
@@ -80,8 +80,8 @@ Status GetObjectRange(std::shared_ptr<Aws::S3::S3Client> client, const S3Path& p
 
 Aws::Client::ClientConfiguration common_config(const SdkOptions& options) {
   Aws::Client::ClientConfiguration conf;
-  conf.region = Aws::Utils::StringUtils::to_string(options.region);
-  conf.endpointOverride = Aws::Utils::StringUtils::to_string(options.endpoint_override);
+  conf.region = options.region;
+  conf.endpointOverride = options.endpoint_override;
   if (options.scheme == "http") {
     conf.scheme = Aws::Http::Scheme::HTTP;
   } else if (options.scheme == "https") {
@@ -109,7 +109,8 @@ Downloader::Downloader(std::shared_ptr<Synchronizer> synchronizer, int pool_size
   // INIT CLIENT FOR INIT CONNECTION OPS, no retry shorter timeout
   Aws::Client::ClientConfiguration init_config_ = common_config(options);
   init_config_.retryStrategy = std::make_shared<Aws::Client::DefaultRetryStrategy>(0);
-  init_config_.httpRequestTimeoutMs = 500;  // timeout trashes the connection
+  init_config_.httpRequestTimeoutMs = 500;
+  init_config_.connectTimeoutMs = 500;
   init_client_.reset(new Aws::S3::S3Client(
       init_config_, Aws::Client::AWSAuthV4Signer::PayloadSigningPolicy::Never,
       use_virtual_addressing));
@@ -123,28 +124,28 @@ void Downloader::InitConnections(std::string bucket, int max_init_count) {
   }
   auto start = util::time::now();
   for (int i = 0; i < max_init_count; i++) {
-    queue_.PushRequest([this, bucket, max_init_count,
-                        start]() -> Result<DownloadResponse> {
+    queue_.PushRequest([this, bucket, max_init_count, start,
+                        i]() -> Result<DownloadResponse> {
       {
         const std::lock_guard<std::mutex> lock(init_interruption_mutex_);
         if (init_counter_ >= max_init_count) {
           auto time_since_init = util::get_duration_ms(start, util::time::now());
-          metrics_manager_->NewInitConnection(time_since_init, 0, 0);
+          metrics_manager_->NewInitConnection("ABORTED", time_since_init, 0, 0);
           return STATUS_ABORTED;
         }
       }
       // use Delete requests because they are free hahaha...
       Aws::S3::Model::DeleteObjectRequest req;
-      req.SetBucket(Aws::Utils::StringUtils::to_string(bucket));
-      req.SetKey(Aws::Utils::StringUtils::to_string("fakekey"));
+      req.SetBucket(bucket);
+      req.SetKey(std::to_string(i) + "/buzzfakekey");
       // we block before releasing the connection to allow up to
       // max_init_count initializations
       util::time::time_point blocking_start_time;
       util::time::time_point blocking_end_time;
-      auto sync_callback = [this, max_init_count, &blocking_start_time,
-                            &blocking_end_time](const Aws::Http::HttpRequest*,
-                                                const Aws::Http::HttpResponse*,
-                                                long long) -> void {
+      req.SetDataReceivedEventHandler([this, max_init_count, &blocking_start_time,
+                                       &blocking_end_time](const Aws::Http::HttpRequest*,
+                                                           const Aws::Http::HttpResponse*,
+                                                           long long) -> void {
         if (blocking_start_time.time_since_epoch().count()) {
           // the callback was already called for this init
           return;
@@ -160,18 +161,28 @@ void Downloader::InitConnections(std::string bucket, int max_init_count) {
           init_interruption_cv_.notify_all();
         }
         blocking_end_time = util::time::now();
-      };
-      req.SetDataReceivedEventHandler(sync_callback);
-      init_client_->DeleteObject(req);
+      });
+      auto outcome = init_client_->DeleteObject(req);
+      std::string result;
+      if (outcome.IsSuccess()) {
+        result = "OK";
+      } else {
+        result = outcome.GetError().GetMessage();
+      }
       if (!blocking_start_time.time_since_epoch().count() &&
           !blocking_end_time.time_since_epoch().count()) {
         // sync_callback never called, likely because of timeout
-        // TODO no need to wait in that case
-        sync_callback(nullptr, nullptr, 0);
+        blocking_start_time = blocking_end_time = util::time::now();
+        std::unique_lock<std::mutex> lock(init_interruption_mutex_);
+        init_counter_++;
+        if (init_counter_ == max_init_count) {
+          lock.unlock();
+          init_interruption_cv_.notify_all();
+        }
       }
       // if resolution_time_ms << 0 it means that the callback was never called
       metrics_manager_->NewInitConnection(
-          util::get_duration_ms(start, util::time::now()),
+          std::move(result), util::get_duration_ms(start, util::time::now()),
           util::get_duration_ms(start, blocking_start_time),
           util::get_duration_ms(blocking_start_time, blocking_end_time));
 

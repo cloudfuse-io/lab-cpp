@@ -17,8 +17,6 @@ static int NB_PARALLEL = util::getenv_int("NB_PARALLEL", 12);
 static int64_t CHUNK_SIZE = util::getenv_int("CHUNK_SIZE", 250000);
 static bool IS_LOCAL = util::getenv_bool("IS_LOCAL", false);
 static int MEMORY_SIZE = util::getenv_int("AWS_LAMBDA_FUNCTION_MEMORY_SIZE", 0);
-static util::Logger LOGGER = util::Logger(IS_LOCAL);
-static int64_t CONTAINER_RUNS = 0;
 
 int64_t download_chunck(std::shared_ptr<arrow::io::RandomAccessFile> infile,
                         int64_t start, int64_t nbbytes) {
@@ -30,11 +28,10 @@ int64_t download_chunck(std::shared_ptr<arrow::io::RandomAccessFile> infile,
 static aws::lambda_runtime::invocation_response my_handler(
     aws::lambda_runtime::invocation_request const& req,
     const arrow::fs::fork::S3Options& options) {
-  CONTAINER_RUNS++;
   // init fs
   std::shared_ptr<arrow::fs::fork::S3FileSystem> fs;
   auto scheduler = std::make_shared<util::ResourceScheduler>(1, 1);
-  auto metrics = std::make_shared<util::MetricsManager>(LOGGER);
+  auto metrics = std::make_shared<util::MetricsManager>();
   PARQUET_ASSIGN_OR_THROW(
       fs, arrow::fs::fork::S3FileSystem::Make(options, scheduler, metrics));
   // init file (calls head)
@@ -60,8 +57,7 @@ static aws::lambda_runtime::invocation_response my_handler(
   }
   auto end_time = std::chrono::high_resolution_clock::now();
   auto total_duration = util::get_duration_ms(start_time, end_time);
-  auto entry = LOGGER.NewEntry("query_bandwidth");
-  entry.IntField("CONTAINER_RUNS", CONTAINER_RUNS);
+  auto entry = Buzz::logger::NewEntry("query_bandwidth");
   entry.IntField("CHUNK_SIZE", CHUNK_SIZE);
   entry.IntField("MEMORY_SIZE", MEMORY_SIZE);
   entry.IntField("NB_PARALLEL", NB_PARALLEL);

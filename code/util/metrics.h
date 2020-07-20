@@ -23,13 +23,11 @@
 #include <thread>
 #include <vector>
 
-#include "logger.h"
-
 namespace util {
 
 class MetricsManager {
  public:
-  MetricsManager(Logger logger);
+  MetricsManager();
   ~MetricsManager();
 
   void Print() const;
@@ -42,8 +40,8 @@ class MetricsManager {
 
   /// track all ssl connection init requests to ensure that they do not slow down the
   /// downloader
-  void NewInitConnection(int64_t total_duration_ms, int64_t resolution_time_ms,
-                         int64_t blocking_time_ms);
+  void NewInitConnection(std::string result, int64_t total_duration_ms,
+                         int64_t resolution_time_ms, int64_t blocking_time_ms);
 
   /// Empty the manager to start tracking a new execution that maintained previous context
   void Reset();

@@ -28,7 +28,7 @@ using namespace arrow;
 class PartialFile : public io::RandomAccessFile {
  public:
   // TODO chunck's exact type must be specified
-  PartialFile(std::vector<void*> chuncks);
+  PartialFile(std::vector<std::shared_ptr<arrow::Buffer>> chuncks);
 
   virtual Result<int64_t> GetSize() override;
   Status Close() override;

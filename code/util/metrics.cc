@@ -21,6 +21,7 @@
 #include <iostream>
 #include <map>
 
+#include "logger.h"
 #include "toolbox.h"
 
 namespace util {
@@ -72,6 +73,7 @@ struct Download {
 struct InitConnection {
   time::time_point timestamp;
   std::thread::id thread_id;
+  std::string result;
   int64_t total_duration_ms;
   int64_t resolution_time_ms;
   int64_t blocking_time_ms;
@@ -80,13 +82,10 @@ struct InitConnection {
 
 class MetricsManager::Impl {
  public:
-  util::Logger logger_;
   concurrent_vector<MetricEvent> events_;
   concurrent_vector<Download> downloads_;
   concurrent_vector<InitConnection> init_connections_;
   time::time_point ref_time_ = time::now();
-
-  Impl(util::Logger logger) : logger_(logger) {}
 
   void PrintEvents() const {
     // event timing stats
@@ -129,7 +128,7 @@ class MetricsManager::Impl {
 
   void PrintDownloads() const {
     for (const auto& event : downloads_.clone()) {
-      auto entry = logger_.NewEntry("downloads", event.timestamp);
+      auto entry = Buzz::logger::NewEntry("downloads", event.timestamp);
       entry.IntField("duration_ms", event.duration_ms);
       entry.IntField("size_B", event.size);
       entry.FloatField("speed_MBpS",
@@ -150,7 +149,8 @@ class MetricsManager::Impl {
 
   void PrintInitConnections() const {
     for (const auto& event : init_connections_.clone()) {
-      auto entry = logger_.NewEntry("init_connection", event.timestamp);
+      auto entry = Buzz::logger::NewEntry("init_connection", event.timestamp);
+      entry.StrField("result", event.result.data());
       entry.IntField("total_duration_ms", event.total_duration_ms);
       entry.IntField("blocking_time_ms", event.blocking_time_ms);
       entry.IntField("resolution_time_ms", event.resolution_time_ms);
@@ -158,11 +158,11 @@ class MetricsManager::Impl {
     }
   }
 
-  void NewInitConnection(int64_t total_duration_ms, int64_t resolution_time_ms,
-                         int64_t blocking_time_ms) {
+  void NewInitConnection(std::string result, int64_t total_duration_ms,
+                         int64_t resolution_time_ms, int64_t blocking_time_ms) {
     InitConnection init_connection{
-        time::now(),        std::this_thread::get_id(), total_duration_ms,
-        resolution_time_ms, blocking_time_ms,
+        time::now(),       std::this_thread::get_id(), std::move(result),
+        total_duration_ms, resolution_time_ms,         blocking_time_ms,
     };
     init_connections_.push_back(init_connection);
   }
@@ -175,13 +175,13 @@ class MetricsManager::Impl {
   }
 };
 
-MetricsManager::MetricsManager(Logger logger) : impl_(new Impl{logger}) {}
+MetricsManager::MetricsManager() : impl_(new Impl{}) {}
 MetricsManager::~MetricsManager() {}
 
 void MetricsManager::Print() const {
   // impl_->PrintEvents();
-  // impl_->PrintInitConnections();
-  // impl_->PrintDownloads();
+  impl_->PrintInitConnections();
+  impl_->PrintDownloads();
 }
 
 void MetricsManager::NewEvent(std::string type) { impl_->NewEvent(type); }
@@ -189,10 +189,11 @@ void MetricsManager::NewEvent(std::string type) { impl_->NewEvent(type); }
 void MetricsManager::NewDownload(int64_t duration_ms, int64_t size) {
   impl_->NewDownload(duration_ms, size);
 }
-void MetricsManager::NewInitConnection(int64_t total_duration_ms,
+void MetricsManager::NewInitConnection(std::string result, int64_t total_duration_ms,
                                        int64_t resolution_time_ms,
                                        int64_t blocking_time_ms) {
-  impl_->NewInitConnection(total_duration_ms, resolution_time_ms, blocking_time_ms);
+  impl_->NewInitConnection(std::move(result), total_duration_ms, resolution_time_ms,
+                           blocking_time_ms);
 }
 
 void MetricsManager::Reset() { impl_->Reset(); }

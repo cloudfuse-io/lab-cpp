@@ -272,18 +272,22 @@ deploy-bench-bee: deploy-bee bench-bee
 # 		--var generic_playground_file=${GEN_PLAY_FILE}
 
 run-hive:
-	@aws ecs run-task \
-		--cluster buzz-cpp-cluster-dev \
+	@cd infra; terraform workspace select ${ENV}
+	aws ecs run-task \
+		--cluster buzz-cpp-cluster-${ENV} \
 		--count 1 \
 		--region ${REGION} \
-		--profile bbdev \
-		--task-definition query-bw-scheduler-static-dev \
+		--profile ${APPLY_PROFILE} \
+		--task-definition ${BUILD_FILE}-static-${ENV} \
 		--query 'failures' \
 		--network-configuration "awsvpcConfiguration={\
-			subnets=[subnet-04781218a08ce132b,subnet-04781218a08ce132b,subnet-04781218a08ce132b],\
-			securityGroups=[sg-05c959b2e4865eb48],\
+			subnets=$(shell cd infra;terraform output subnet_ids),\
+			securityGroups=[$(shell cd infra;terraform output query-bw-scheduler-fargate_security_group_id)],\
 			assignPublicIp=ENABLED\
 			}"
+
+run-query-bw-scheduler:
+	ENV=dev APPLY_PROFILE=bbdev BUILD_FILE=query-bw-scheduler make run-hive
 
 # deploy-run-hive: deploy-hive
 # 	sleep 2
@@ -295,15 +299,18 @@ init-dev:
 	cd infra; terraform workspace select dev
 	cd infra; terraform init
 
-force-deploy-dev:
+force-deploy:
 	BUILD_FILE=query-bw-scheduler IMAGE_TAG="${GIT_REVISION}" make dockerify-hive
 	BUILD_FILE=query-bandwidth2 make package-bee
 	BUILD_FILE=mem-bandwidth make package-bee
 	BUILD_FILE=${GEN_PLAY_FILE} make package-bee
-	@echo "DEPLOYING ${GIT_REVISION} to dev ..."
-	@cd infra; terraform workspace select dev
+	@echo "DEPLOYING ${GIT_REVISION} to ${ENV} ..."
+	@cd infra; terraform workspace select ${ENV}
 	@cd infra; terraform apply \
-		--var profile=bbdev \
+		--var profile=${APPLY_PROFILE} \
 		--var git_revision=${GIT_REVISION} \
 		--var generic_playground_file=${GEN_PLAY_FILE}
 	@echo "${GIT_REVISION} DEPLOYED !!!"
+
+force-deploy-dev:
+	ENV=dev APPLY_PROFILE=bbdev make force-deploy

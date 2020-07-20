@@ -40,7 +40,6 @@ static const int64_t COLUMN_ID = util::getenv_int("COLUMN_ID", 16);
 static const bool AS_DICT = util::getenv_bool("AS_DICT", true);
 static const auto mem_pool = new arrow::CustomMemoryPool(arrow::default_memory_pool());
 static const bool IS_LOCAL = util::getenv_bool("IS_LOCAL", false);
-static util::Logger LOGGER = util::Logger(IS_LOCAL);
 
 // helper
 std::unique_ptr<parquet::arrow::FileReader> get_column(
@@ -120,7 +119,7 @@ static aws::lambda_runtime::invocation_response my_handler(
     aws::lambda_runtime::invocation_request const& req) {
   auto scheduler =
       std::make_shared<util::ResourceScheduler>(MAX_CONCURRENT_DL, MAX_CONCURRENT_PROC);
-  auto metrics = std::make_shared<util::MetricsManager>(LOGGER);
+  auto metrics = std::make_shared<util::MetricsManager>();
 
   //// setup s3fs ////
   arrow::fs::fork::S3Options options = arrow::fs::fork::S3Options::Defaults();

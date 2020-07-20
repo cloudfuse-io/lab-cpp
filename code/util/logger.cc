@@ -15,31 +15,41 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#include "logger.h"
+
 #include <algorithm>
 #include <iostream>
 #include <map>
 
-#include "metrics.h"
 #include "toolbox.h"
 
-namespace util {
+namespace Buzz {
+
+namespace logger {
 using namespace rapidjson;
 
-Logger::Logger(bool is_local) : is_local_(is_local) {
-  if (!is_local) {
-    // init s3
-  }
+static int64_t CONTAINER_RUNS = 0;
+
+LogEntry NewEntry(const char* msg, util::time::time_point timestamp) {
+  return LogEntry(msg, timestamp);
 }
 
-LogEntry::LogEntry(const char* msg, time::time_point timestamp, bool is_local)
-    : buffer_(), writer_(buffer_), is_local_(is_local) {
+void IncrementRunCounter() { CONTAINER_RUNS++; }
+
+LogEntry::LogEntry(const char* msg, util::time::time_point timestamp)
+    : buffer_(), writer_(buffer_) {
   writer_.StartObject();
-  writer_.Key("time");
-  auto now = std::chrono::time_point_cast<std::chrono::milliseconds>(timestamp);
-  auto datestring = arrow_vendored::date::format("%FT%T%z", now);
-  writer_.String(datestring.data());
+  writer_.Key("ts");
+  auto ts =
+      std::chrono::duration_cast<std::chrono::milliseconds>(timestamp.time_since_epoch())
+          .count();
+  writer_.Int64(ts);
   writer_.Key("msg");
   writer_.String(msg);
+  if (CONTAINER_RUNS > 0) {
+    writer_.Key("run");
+    writer_.Int64(CONTAINER_RUNS);
+  }
 }
 
 void LogEntry::StrField(const char* key, const char* value) {
@@ -59,12 +69,8 @@ void LogEntry::FloatField(const char* key, double value) {
 
 void LogEntry::Log() {
   writer_.EndObject();
-  if (is_local_) {
-    std::cout << buffer_.GetString() << std::endl;
-  } else {
-    // TODO add to s3 buffer intead of logging
-    std::cout << buffer_.GetString() << std::endl;
-  }
+  std::cout << buffer_.GetString() << std::endl;
 }
 
-}  // namespace util
+}  // namespace logger
+}  // namespace Buzz

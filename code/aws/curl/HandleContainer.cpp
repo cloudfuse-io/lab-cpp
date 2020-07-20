@@ -54,7 +54,7 @@ class DomainHandleCache {
     if (item == containers_.end()) {
       AWS_LOGSTREAM_INFO(CURL_HANDLE_CONTAINER_TAG,
                          "Creating handle container for " << domain);
-      item = containers_.emplace(domain, std::vector<CURL*>()).first;
+      item = containers_.try_emplace(domain).first;
     }
     // check if a connection can be found in the cache, otherwise create a new one
     if (item->second.size() > 0) {

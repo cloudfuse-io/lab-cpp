@@ -326,6 +326,7 @@ std::shared_ptr<Aws::Http::HttpResponse> CurlHttpClient::MakeRequest(
     const std::shared_ptr<Aws::Http::HttpRequest>& request,
     Aws::Utils::RateLimits::RateLimiterInterface* readLimiter,
     Aws::Utils::RateLimits::RateLimiterInterface* writeLimiter) const {
+  auto start = util::time::now();
   Aws::Http::URI uri = request->GetUri();
   Aws::String url = uri.GetURIString();
   std::shared_ptr<Aws::Http::HttpResponse> response =
@@ -529,6 +530,9 @@ std::shared_ptr<Aws::Http::HttpResponse> CurlHttpClient::MakeRequest(
                           "Releasing curl handle " << connectionHandle);
     }
 
+    auto entry = Buzz::logger::NewEntry("client_stats");
+    entry.IntField("curl_code", curlResponseCode);
+
     double dns_time = 0;
     CURLcode ret = curl_easy_getinfo(connectionHandle, CURLINFO_NAMELOOKUP_TIME,
                                      &dns_time);  // DNS Resolve Latency, seconds.
@@ -537,6 +541,7 @@ std::shared_ptr<Aws::Http::HttpResponse> CurlHttpClient::MakeRequest(
           Aws::Monitoring::GetHttpClientMetricNameByType(
               Aws::Monitoring::HttpClientMetricsType::DnsLatency),
           static_cast<int64_t>(dns_time * 1000));  // to milliseconds
+      entry.IntField("dns_ms", dns_time * 1000);
     }
 
     double starttransfer_time = 0;
@@ -547,6 +552,7 @@ std::shared_ptr<Aws::Http::HttpResponse> CurlHttpClient::MakeRequest(
           Aws::Monitoring::GetHttpClientMetricNameByType(
               Aws::Monitoring::HttpClientMetricsType::ConnectLatency),
           static_cast<int64_t>(starttransfer_time * 1000));
+      entry.IntField("starttransfer_ms", starttransfer_time * 1000);
     }
 
     double appconnect_time = 0;
@@ -556,14 +562,11 @@ std::shared_ptr<Aws::Http::HttpResponse> CurlHttpClient::MakeRequest(
       request->AddRequestMetric(Aws::Monitoring::GetHttpClientMetricNameByType(
                                     Aws::Monitoring::HttpClientMetricsType::SslLatency),
                                 static_cast<int64_t>(appconnect_time * 1000));
+      entry.IntField("appconnect_ms", appconnect_time * 1000);
     }
 
-    // std::stringstream ss;
-    // ss << "dns_time=" << static_cast<int64_t>(dns_time * 1000)
-    //    << ",starttransfer_time=" << static_cast<int64_t>(starttransfer_time * 1000)
-    //    << ",appconnect_time=" << static_cast<int64_t>(appconnect_time * 1000)
-    //    << std::endl;
-    // std::cout << ss.str();
+    entry.IntField("total_ms", util::get_duration_ms(start, util::time::now()));
+    entry.Log();
 
     const char* ip = nullptr;
     auto curlGetInfoResult =

@@ -21,15 +21,21 @@
 
 #include <iostream>
 
+#include "logger.h"
 #include "toolbox.h"
 
 template <typename Func>
 void bootstrap(Func handler) {
+  auto wrapped_handler =
+      [handler](const aws::lambda_runtime::invocation_request& request) {
+        Buzz::logger::IncrementRunCounter();
+        return handler(request);
+      };
   if (util::getenv_bool("IS_LOCAL", false)) {
     aws::lambda_runtime::invocation_response response =
-        handler(aws::lambda_runtime::invocation_request());
+        wrapped_handler(aws::lambda_runtime::invocation_request());
     std::cout << "response: " << response.get_payload() << std::endl;
   } else {
-    aws::lambda_runtime::run_handler(handler);
+    aws::lambda_runtime::run_handler(wrapped_handler);
   }
 }

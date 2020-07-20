@@ -12,16 +12,14 @@ static int MAX_PARALLEL = util::getenv_int("MAX_PARALLEL", 12);
 static int64_t CHUNK_SIZE = util::getenv_int("CHUNK_SIZE", 250000);
 static int MEMORY_SIZE = util::getenv_int("AWS_LAMBDA_FUNCTION_MEMORY_SIZE", 0);
 static bool IS_LOCAL = util::getenv_bool("IS_LOCAL", false);
-static util::Logger LOGGER = util::Logger(IS_LOCAL);
-static int64_t CONTAINER_RUNS = 0;
 
 static aws::lambda_runtime::invocation_response my_handler(
     const aws::lambda_runtime::invocation_request& req, const SdkOptions& options) {
-  CONTAINER_RUNS++;
   auto synchronizer = std::make_shared<Synchronizer>();
-  auto metrics_manager = std::make_shared<util::MetricsManager>(LOGGER);
+  auto metrics_manager = std::make_shared<util::MetricsManager>();
   // metrics_manager->Reset();
   Downloader downloader{synchronizer, MAX_PARALLEL, metrics_manager, options};
+  // init connections
   auto nb_inits = MAX_PARALLEL;
   downloader.InitConnections("bb-test-data-dev", nb_inits);
   int inits_completed = 0;
@@ -63,8 +61,7 @@ static aws::lambda_runtime::invocation_response my_handler(
   metrics_manager->NewEvent("handler_end");
   // logging all results
   metrics_manager->Print();
-  auto entry = LOGGER.NewEntry("query_bandwidth2");
-  entry.IntField("CONTAINER_RUNS", CONTAINER_RUNS);
+  auto entry = Buzz::logger::NewEntry("query_bandwidth2");
   entry.IntField("NB_CHUNCK", NB_CHUNCK);
   entry.IntField("MAX_PARALLEL", MAX_PARALLEL);
   entry.IntField("CHUNK_SIZE", CHUNK_SIZE);

@@ -14,6 +14,9 @@ if("${BUZZ_BUILD_TESTS}" STREQUAL "ON")
   FetchContent_MakeAvailable(googletest)
   enable_testing()
   include(GoogleTest)
+  # custom test utils:
+  set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}" ${CMAKE_MODULE_PATH})
+  include(TestUtils)
 endif()
 
 

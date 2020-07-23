@@ -40,8 +40,10 @@ struct S3Path {
 };
 
 /// if range_start==range_end==0 this is an init request
+/// else follow https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.35
+/// bytes=range_start-range_end
 struct DownloadRequest {
-  int64_t range_start;
+  std::optional<int64_t> range_start;
   int64_t range_end;
   S3Path path;
 };
@@ -49,6 +51,7 @@ struct DownloadRequest {
 struct DownloadResponse {
   DownloadRequest request;
   std::shared_ptr<arrow::Buffer> raw_data;
+  int64_t file_size;
 };
 
 class Downloader {

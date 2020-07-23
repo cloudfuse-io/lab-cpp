@@ -179,9 +179,9 @@ MetricsManager::MetricsManager() : impl_(new Impl{}) {}
 MetricsManager::~MetricsManager() {}
 
 void MetricsManager::Print() const {
-  // impl_->PrintEvents();
+  impl_->PrintEvents();
   impl_->PrintInitConnections();
-  impl_->PrintDownloads();
+  // impl_->PrintDownloads();
 }
 
 void MetricsManager::NewEvent(std::string type) { impl_->NewEvent(type); }

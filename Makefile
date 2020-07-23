@@ -149,6 +149,11 @@ run-local-parquet-raw-reader:
 	BUILD_FILE=parquet-raw-reader \
 	make run-bee-local
 
+run-local-parquet-raw-reader2:
+	COMPOSE_TYPE=minio \
+	BUILD_FILE=parquet-raw-reader2 \
+	make run-bee-local
+
 run-local-mem-alloc-overprov:
 	COMPOSE_TYPE=standalone \
 	BUILD_FILE=mem-alloc-overprov \
@@ -240,22 +245,35 @@ deploy-run-bee: deploy-bee
 	sleep 2
 	make run-bee
 
-bench-bee:
+deploy-bench-query-bandwidth2:
+	GEN_PLAY_FILE=query-bandwidth2 make deploy-bee 
 	@# change the unused param "handler" to reset lambda state
-	number=1 ; while [[ $$number -le 20 ]] ; do \
+	number=1 ; while [[ $$number -le 1 ]] ; do \
 		aws lambda update-function-configuration \
 			--function-name buzz-cpp-generic-playground-static-dev \
 			--handler "N/A-$$number" \
 			--region ${REGION} \
 			--profile bbdev  > /dev/null 2>&1; \
-		make run-bee 2>&- | grep '^{.*}$$'; \
-		make run-bee 2>&- | grep '^{.*}$$'; \
-		make run-bee 2>&- | grep '^{.*}$$'; \
-		make run-bee 2>&- | grep '^{.*}$$'; \
+		make run-bee 2>&- | grep '^{.*query_bandwidth2.*}$$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .run]|@csv'; \
+		make run-bee 2>&- | grep '^{.*query_bandwidth2.*}$$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .run]|@csv'; \
+		make run-bee 2>&- | grep '^{.*query_bandwidth2.*}$$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .run]|@csv'; \
+		make run-bee 2>&- | grep '^{.*query_bandwidth2.*}$$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .run]|@csv'; \
 		((number = number + 1)) ; \
 	done
 
-deploy-bench-bee: deploy-bee bench-bee 
+deploy-bench-parquet-raw-reader2:
+	GEN_PLAY_FILE=parquet-raw-reader2 make deploy-bee 
+	@# change the unused param "handler" to reset lambda state
+	number=1 ; while [[ $$number -le 25 ]] ; do \
+		aws lambda update-function-configuration \
+			--function-name buzz-cpp-generic-playground-static-dev \
+			--handler "N/A-$$number" \
+			--region ${REGION} \
+			--profile bbdev  > /dev/null 2>&1; \
+		make run-bee 2>&- | grep '^{.*wait_s3.*}$$' | jq -r '[.nb_init, .footer, .dl, .total, .run]|@csv'; \
+		make run-bee 2>&- | grep '^{.*wait_s3.*}$$' | jq -r '[.nb_init, .footer, .dl, .total, .run]|@csv'; \
+		((number = number + 1)) ; \
+	done
 
 # | grep '^{.*query_bandwidth2.*}$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .CONTAINER_RUNS]|@csv'
 

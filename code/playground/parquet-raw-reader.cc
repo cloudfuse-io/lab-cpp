@@ -73,17 +73,17 @@ void read_single_column_parallel(std::unique_ptr<parquet::ParquetFileReader> rea
       uint8_t* values;
       mem_pool->Allocate(batch_size * sizeof(parquet::ByteArray), &values);
       auto values_casted = reinterpret_cast<parquet::ByteArray*>(values);
-      util::CountStat<parquet::ByteArray> count_stat;
+      // util::CountStat<parquet::ByteArray> count_stat;
       while (typed_reader->HasNext()) {
         int64_t values_read = 0;
         typed_reader->ReadBatch(batch_size, nullptr, nullptr, values_casted,
                                 &values_read);
-        count_stat.Add(values_casted, values_read);
+        // count_stat.Add(values_casted, values_read);
         total_values_read += values_read;
       }
       fs->GetResourceScheduler()->NotifyProcessingDone();
       fs->GetMetrics()->NewEvent("read_end");
-      count_stat.Print();
+      // count_stat.Print();
       return total_values_read;
     });
     rg_futures.push_back(std::move(fut));

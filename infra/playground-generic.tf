@@ -21,6 +21,15 @@ locals {
       }
       additional_policies = [aws_iam_policy.s3-additional-policy.arn]
     }
+    parquet-raw-reader2 = {
+      memory_size = 2048
+      environment = {
+        MAX_CONCURRENT_DL : 8
+        NB_CONN_INIT : 1
+        COLUMN_ID : 16
+      }
+      additional_policies = [aws_iam_policy.s3-additional-policy.arn]
+    }
     query-bandwidth = {
       memory_size = 2048
       environment = {

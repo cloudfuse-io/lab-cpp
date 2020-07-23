@@ -24,15 +24,38 @@
 #include <aws/s3/model/GetObjectRequest.h>
 
 #include <cassert>
+#include <string>
 
 #include "toolbox.h"
 
 namespace {
-std::string FormatRange(int64_t start, int64_t length) {
+std::string FormatRange(std::optional<int64_t> start, int64_t end) {
   // Format a HTTP range header value
   std::stringstream ss;
-  ss << "bytes=" << start << "-" << start + length - 1;
+  ss << "bytes=";
+  if (start.has_value()) {
+    ss << start.value();
+  }
+  ss << "-";
+  ss << end;
   return ss.str();
+}
+
+/// get file size from range string
+Result<int64_t> ParseRange(std::string response_range) {
+  auto size_split = response_range.find("/");
+  if (size_split == std::string::npos) {
+    return Status::IOError("Unexpected content range: ", response_range);
+  }
+  return std::stoll(response_range.substr(size_split + 1));
+}
+
+int64_t CalculateLength(std::optional<int64_t> start, int64_t end) {
+  if (!start.has_value()) {
+    return end;
+  } else {
+    return end - start.value() + 1;
+  }
 }
 
 class StringViewStream : Aws::Utils::Stream::PreallocatedStreamBuf, public std::iostream {
@@ -56,25 +79,39 @@ Status S3ErrorToStatus(const Aws::Client::AWSError<Aws::S3::S3Errors>& error) {
                          "]: ", error.GetMessage());
 }
 
-Status GetObjectRange(std::shared_ptr<Aws::S3::S3Client> client, const S3Path& path,
-                      int64_t start, int64_t length, void* out,
-                      std::shared_ptr<util::MetricsManager> metrics_manager) {
+struct ObjectRangeResult {
+  std::shared_ptr<arrow::Buffer> raw_data;
+  int64_t file_size;
+};
+
+Result<ObjectRangeResult> GetObjectRange(
+    std::shared_ptr<Aws::S3::S3Client> client, const S3Path& path,
+    std::optional<int64_t> start, int64_t end,
+    std::shared_ptr<util::MetricsManager> metrics_manager) {
+  auto nbytes = CalculateLength(start, end);
+  ARROW_ASSIGN_OR_RAISE(auto buf, arrow::AllocateResizableBuffer(nbytes));
   Aws::S3::Model::GetObjectRequest req;
   req.SetBucket(path.bucket);
   req.SetKey(path.key);
-  req.SetRange(FormatRange(start, length));
-  req.SetResponseStreamFactory(AwsWriteableStreamFactory(out, length));
+  req.SetRange(FormatRange(start, end));
+  req.SetResponseStreamFactory(AwsWriteableStreamFactory(buf->mutable_data(), nbytes));
+  auto start_time = util::time::now();
   auto object_outcome = client->GetObject(req);
+  metrics_manager->NewDownload(util::get_duration_ms(start_time, util::time::now()),
+                               nbytes);
   if (!object_outcome.IsSuccess()) {
     return S3ErrorToStatus(object_outcome.GetError());
   }
   auto object_result = std::move(object_outcome).GetResultWithOwnership();
+  // extract from headers
+  ARROW_ASSIGN_OR_RAISE(auto file_size, ParseRange(object_result.GetContentRange()));
+  // extract body
   auto& stream = object_result.GetBody();
-  stream.ignore(length);
-  if (stream.gcount() != length) {
-    return Status::IOError("Read ", stream.gcount(), " bytes instead of ", length);
+  stream.ignore(nbytes);
+  if (stream.gcount() != nbytes) {
+    return Status::IOError("Read ", stream.gcount(), " bytes instead of ", nbytes);
   }
-  return Status::OK();
+  return ObjectRangeResult{std::move(buf), file_size};
 }
 }  // namespace
 
@@ -192,23 +229,20 @@ void Downloader::InitConnections(std::string bucket, int max_init_count) {
 }
 
 void Downloader::ScheduleDownload(DownloadRequest request) {
+  // cancel all pending inits to replace them with real work
   {
     const std::lock_guard<std::mutex> lock(init_interruption_mutex_);
     init_counter_ = pool_size_;
   }
   init_interruption_cv_.notify_all();
+  // queue the request
   queue_.PushRequest([request, this]() -> Result<DownloadResponse> {
-    int64_t nbytes = request.range_end - request.range_start + 1;
-    ARROW_ASSIGN_OR_RAISE(auto buf, arrow::AllocateResizableBuffer(nbytes));
-    auto start = util::time::now();
     metrics_manager_->NewEvent("get_obj_start");
-    RETURN_NOT_OK(GetObjectRange(dl_client_, request.path, request.range_start, nbytes,
-                                 buf->mutable_data(), metrics_manager_));
-    metrics_manager_->NewDownload(util::get_duration_ms(start, util::time::now()),
-                                  nbytes);
+    ARROW_ASSIGN_OR_RAISE(auto result,
+                          GetObjectRange(dl_client_, request.path, request.range_start,
+                                         request.range_end, metrics_manager_));
     metrics_manager_->NewEvent("get_obj_end");
-
-    return DownloadResponse{request, std::shared_ptr<arrow::Buffer>(std::move(buf))};
+    return DownloadResponse{request, result.raw_data, result.file_size};
   });
 }
 

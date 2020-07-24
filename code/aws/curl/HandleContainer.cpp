@@ -15,54 +15,54 @@
 namespace Buzz {
 namespace Http {
 
-// #define NUM_LOCKS CURL_LOCK_DATA_LAST
-// static std::mutex share_lock[NUM_LOCKS];
+#define NUM_LOCKS CURL_LOCK_DATA_LAST
+static std::mutex share_lock[NUM_LOCKS];
 
-// static void lock_cb(CURL* handle, curl_lock_data data, curl_lock_access access,
-//                     void* userptr) {
-//   share_lock[data].lock();
-// }
+static void lock_cb(CURL* handle, curl_lock_data data, curl_lock_access access,
+                    void* userptr) {
+  // TODO make lock specific to domain because share is
+  share_lock[data].lock();
+}
 
-// static void unlock_cb(CURL* handle, curl_lock_data data, void* userptr) {
-//   share_lock[data].unlock();
-// }
-
-// static CURLSH* share_object = []() {
-//   auto new_state = curl_share_init();
-//   /// dns resolution typically takes ~15ms
-//   curl_share_setopt(new_state, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
-//   /// ssl session establishement takes ~150ms
-//   curl_share_setopt(new_state, CURLSHOPT_SHARE, CURL_LOCK_DATA_SSL_SESSION);
-//   /// connection establishement is mostly dominated by ssl handshake duration, ~180ms
-//   /// CURL_LOCK_DATA_CONNECT seems to crash on most libcurl versions (curl/curl #4557)
-//   // curl_share_setopt(new_state, CURLSHOPT_SHARE, CURL_LOCK_DATA_CONNECT);
-//   /// set lock/unlock of shared state
-//   curl_share_setopt(new_state, CURLSHOPT_LOCKFUNC, lock_cb);
-//   curl_share_setopt(new_state, CURLSHOPT_UNLOCKFUNC, unlock_cb);
-//   return new_state;
-// }();
+static void unlock_cb(CURL* handle, curl_lock_data data, void* userptr) {
+  share_lock[data].unlock();
+}
 
 static const char* CURL_HANDLE_CONTAINER_TAG = "CurlHandleContainer";
 
 namespace {
+
+static CURLSH* new_share() {
+  auto new_state = curl_share_init();
+  /// dns resolution typically takes ~15ms
+  curl_share_setopt(new_state, CURLSHOPT_SHARE, CURL_LOCK_DATA_DNS);
+  // CURL_LOCK_DATA_SSL_SESSION and CURL_LOCK_DATA_CONNECT are not needed as they are
+  // managed at the level of the handle
+  /// set lock/unlock of shared state
+  curl_share_setopt(new_state, CURLSHOPT_LOCKFUNC, lock_cb);
+  curl_share_setopt(new_state, CURLSHOPT_UNLOCKFUNC, unlock_cb);
+  return new_state;
+};
+
 /// A container that stacks initialized connections for each domain
 class DomainHandleCache {
  public:
   CURL* acquire(std::string domain) {
     std::lock_guard<std::mutex> locker(mutex_);
-    auto item = containers_.find(domain);
-    if (item == containers_.end()) {
+    auto item = cache_.find(domain);
+    if (item == cache_.end()) {
       AWS_LOGSTREAM_INFO(CURL_HANDLE_CONTAINER_TAG,
                          "Creating handle container for " << domain);
-      item = containers_.try_emplace(domain).first;
+      item = cache_.emplace(domain, DomainHandles{{}, new_share()}).first;
     }
     // check if a connection can be found in the cache, otherwise create a new one
-    if (item->second.size() > 0) {
-      auto cached_handle = item->second.back();
-      item->second.pop_back();
+    if (item->second.handles.size() > 0) {
+      auto cached_handle = item->second.handles.back();
+      item->second.handles.pop_back();
       return cached_handle;
     } else {
       auto new_handle = curl_easy_init();
+      curl_easy_setopt(new_handle, CURLOPT_SHARE, item->second.share);
       AWS_LOGSTREAM_DEBUG(CURL_HANDLE_CONTAINER_TAG,
                           "Creating new handle " << new_handle << " for " << domain);
       return new_handle;
@@ -71,19 +71,24 @@ class DomainHandleCache {
 
   void release(std::string domain, CURL* handle) {
     std::lock_guard<std::mutex> locker(mutex_);
-    containers_[domain].push_back(handle);
+    cache_[domain].handles.push_back(handle);
   }
 
   ~DomainHandleCache() {
-    for (auto& domain : containers_) {
-      for (auto handle : domain.second) {
+    for (auto& domain_handles : cache_) {
+      for (auto handle : domain_handles.second.handles) {
         curl_easy_cleanup(handle);
       }
+      curl_share_cleanup(domain_handles.second.share);
     }
   }
 
  private:
-  std::map<std::string, std::vector<CURL*>> containers_;
+  struct DomainHandles {
+    std::vector<CURL*> handles;
+    CURLSH* share;
+  };
+  std::map<std::string, DomainHandles> cache_;
   std::mutex mutex_;
 };
 }  // namespace

@@ -24,6 +24,7 @@
 #include <string>
 
 namespace util {
+
 inline int64_t get_duration_ms(std::chrono::_V2::system_clock::time_point start,
                                std::chrono::_V2::system_clock::time_point end) {
   return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -59,5 +60,15 @@ inline const char* getenv(const char* name, const char* def) {
 }
 
 using time = std::chrono::high_resolution_clock;
+
+/// generate a "random" char from the current time low bits
+inline char random_alphanum() {
+  constexpr char charset[] =
+      "0123456789"
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+      "abcdefghijklmnopqrstuvwxyz";
+  constexpr size_t max_index = (sizeof(charset) - 1);
+  return charset[time::now().time_since_epoch().count() % max_index];
+}
 
 }  // namespace util

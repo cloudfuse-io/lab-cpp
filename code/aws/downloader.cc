@@ -174,7 +174,12 @@ void Downloader::InitConnections(std::string bucket, int max_init_count) {
       // use Delete requests because they are free hahaha...
       Aws::S3::Model::DeleteObjectRequest req;
       req.SetBucket(bucket);
-      req.SetKey(std::to_string(i) + "/buzzfakekey");
+      // TODO how should we prefix to avoid slow down ?
+      std::string randomized_key;
+      randomized_key.push_back(util::random_alphanum());
+      randomized_key += "/buzzfakekey";
+      std::cout << "randomized_key:" << randomized_key << std::endl;
+      req.SetKey(randomized_key);
       // we block before releasing the connection to allow up to
       // max_init_count initializations
       util::time::time_point blocking_start_time;

@@ -35,7 +35,7 @@
 // extern char* je_arrow_malloc_conf;
 
 static const int MAX_CONCURRENT_DL = util::getenv_int("MAX_CONCURRENT_DL", 8);
-static const int NB_CONN_INIT = util::getenv_int("NB_CONN_INIT", 0);
+static const int NB_CONN_INIT = util::getenv_int("NB_CONN_INIT", 1);
 static const int64_t COLUMN_ID = util::getenv_int("COLUMN_ID", 16);
 static const auto mem_pool = new arrow::CustomMemoryPool(arrow::default_memory_pool());
 static const bool IS_LOCAL = util::getenv_bool("IS_LOCAL", false);
@@ -122,6 +122,7 @@ static aws::lambda_runtime::invocation_response my_handler(
   std::map<int64_t, int> rg_start_map;
 
   for (int i = 0; i < file_metadata->num_row_groups(); i++) {
+    // TODO a more progressive scheduling of new connections
     auto col_chunck_meta = file_metadata->RowGroup(i)->ColumnChunk(COLUMN_ID);
     auto col_chunck_start = col_chunck_meta->file_offset();
     downloader.ScheduleDownload(
@@ -177,9 +178,9 @@ static aws::lambda_runtime::invocation_response my_handler(
   }
   metrics_manager->NewEvent("processings_finished");
 
-  // std::cout << "downloaded_chuncks:" << downloaded_chuncks
-  //           << "/downloaded_bytes:" << downloaded_bytes << "/rows_read:" << rows_read
-  //           << std::endl;
+  std::cout << "downloaded_chuncks:" << downloaded_chuncks
+            << "/downloaded_bytes:" << downloaded_bytes << "/rows_read:" << rows_read
+            << std::endl;
   metrics_manager->Print();
 
   std::cout << "wait_dur:";

@@ -16,9 +16,10 @@
 // under the License.
 
 #include <arrow/api.h>
+#include <arrow/compute/api.h>
 #include <arrow/io/api.h>
 #include <aws/lambda-runtime/runtime.h>
-#include <parquet/api/reader.h>
+#include <parquet/arrow/reader.h>
 #include <parquet/exception.h>
 
 #include <iostream>
@@ -30,51 +31,37 @@
 #include "parquet-helpers.h"
 #include "partial-file.h"
 #include "sdk-init.h"
-#include "stats.h"
 #include "toolbox.h"
 
 // extern char* je_arrow_malloc_conf;
 
-static const int MAX_CONCURRENT_DL = util::getenv_int("MAX_CONCURRENT_DL", 8);
+static const int64_t MAX_CONCURRENT_DL = util::getenv_int("MAX_CONCURRENT_DL", 8);
 static const int NB_CONN_INIT = util::getenv_int("NB_CONN_INIT", 1);
 static const int64_t COLUMN_ID = util::getenv_int("COLUMN_ID", 16);
+static const bool AS_DICT = util::getenv_bool("AS_DICT", true);
 static const auto mem_pool = new arrow::CustomMemoryPool(arrow::default_memory_pool());
 static const bool IS_LOCAL = util::getenv_bool("IS_LOCAL", false);
 
 // Read a column chunck
-int64_t read_column_chunck(std::shared_ptr<Buzz::PartialFile> rg_file,
-                           std::shared_ptr<parquet::FileMetaData> file_metadata, int rg) {
-  parquet::ReaderProperties props(mem_pool);
-  std::unique_ptr<parquet::ParquetFileReader> reader =
-      parquet::ParquetFileReader::Open(rg_file, props, file_metadata);
-  // reader->metadata()->schema()->Column(col_index)->logical_type();
-  auto untyped_col = reader->RowGroup(rg)->Column(COLUMN_ID);
-  // untyped_col->type()
-  // BOOLEAN = 0,
-  // INT32 = 1,
-  // INT64 = 2,
-  // INT96 = 3,
-  // FLOAT = 4,
-  // DOUBLE = 5,
-  // BYTE_ARRAY = 6,
-  // FIXED_LEN_BYTE_ARRAY = 7,
-  // UNDEFINED = 8
-  auto* typed_reader = static_cast<parquet::ByteArrayReader*>(untyped_col.get());
-  constexpr int batch_size = 1024 * 2;
-  int64_t total_values_read = 0;
-  // this should be aligned
-  uint8_t* values;
-  mem_pool->Allocate(batch_size * sizeof(parquet::ByteArray), &values);
-  auto values_casted = reinterpret_cast<parquet::ByteArray*>(values);
-  // util::CountStat<parquet::ByteArray> count_stat;
-  while (typed_reader->HasNext()) {
-    int64_t values_read = 0;
-    typed_reader->ReadBatch(batch_size, nullptr, nullptr, values_casted, &values_read);
-    // count_stat.Add(values_casted, values_read);
-    total_values_read += values_read;
-  }
-  // count_stat.Print();
-  return total_values_read;
+Result<int64_t> read_column_chunck(std::shared_ptr<::arrow::io::RandomAccessFile> rg_file,
+                                   std::shared_ptr<parquet::FileMetaData> file_metadata,
+                                   int rg) {
+  std::unique_ptr<parquet::arrow::FileReader> reader;
+  parquet::arrow::FileReaderBuilder builder;
+  parquet::ReaderProperties parquet_props(mem_pool);
+  PARQUET_THROW_NOT_OK(builder.Open(rg_file, parquet_props, file_metadata));
+  // here the footer gets downloaded
+  builder.memory_pool(mem_pool);
+  auto arrow_props = parquet::ArrowReaderProperties();
+  arrow_props.set_read_dictionary(COLUMN_ID, AS_DICT);
+  builder.properties(arrow_props);
+  PARQUET_THROW_NOT_OK(builder.Build(&reader));
+
+  // start rowgroup read at the same time
+  std::shared_ptr<arrow::ChunkedArray> array;
+  PARQUET_THROW_NOT_OK(reader->RowGroup(rg)->Column(COLUMN_ID)->Read(&array));
+  // collect rowgroup results
+  return array->length();
 }
 
 static aws::lambda_runtime::invocation_response my_handler(
@@ -92,6 +79,8 @@ static aws::lambda_runtime::invocation_response my_handler(
       Buzz::GetMetadata(downloader, synchronizer, mem_pool, file_path, NB_CONN_INIT);
 
   auto wait_for_foot = util::get_duration_ms(wait_for_foot_start, util::time::now());
+  std::cout << "col processed: " << file_metadata->schema()->Column(COLUMN_ID)->name()
+            << std::endl;
 
   // Download column chuncks
   for (int i = 0; i < file_metadata->num_row_groups(); i++) {
@@ -120,7 +109,8 @@ static aws::lambda_runtime::invocation_response my_handler(
       metrics_manager->NewEvent("starting_proc");
       // read chunck
       rows_read += read_column_chunck(col_chunck_file.file, file_metadata,
-                                      col_chunck_file.row_group);
+                                      col_chunck_file.row_group)
+                       .ValueOrDie();
       downloaded_chuncks++;
       processing_durations.push_back(
           util::get_duration_ms(start_processing, util::time::now()));

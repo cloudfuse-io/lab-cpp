@@ -3,7 +3,6 @@ add_library (buzz-util STATIC
   dispatcher.cc
   metrics.cc
   logger.cc
-  scheduler.cc
   stats.cc)
 target_include_directories(buzz-util PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_arrow(buzz-util)

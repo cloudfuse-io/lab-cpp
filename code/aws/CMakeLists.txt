@@ -1,5 +1,4 @@
 add_library(buzz-aws STATIC
-  s3fs-forked.cc
   sdk-init.cc
   downloader.cc
   partial-file.cc
@@ -9,6 +8,10 @@ add_library(buzz-aws STATIC
 target_include_directories(buzz-aws PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_arrow(buzz-aws)
 target_link_libraries(buzz-aws PRIVATE buzz-util)
+
+find_package(AWSSDK COMPONENTS config s3 transfer lambda)
+target_link_libraries(buzz-aws PRIVATE ${AWSSDK_LINK_LIBRARIES})
+
 list(APPEND BUZZ_ALL buzz-aws)
 
 if("${BUZZ_BUILD_TESTS}" STREQUAL "ON")

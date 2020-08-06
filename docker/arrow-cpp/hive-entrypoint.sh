@@ -13,7 +13,6 @@ if [ "$1" = 'build' ]; then
       -DARROW_JEMALLOC=ON \
       -DARROW_PARQUET=ON \
       -DARROW_JSON=ON \
-      -DARROW_S3=ON \
       -DARROW_FILESYSTEM=ON \
       -DARROW_FLIGHT=ON \
       -DARROW_WITH_ZLIB=ON \

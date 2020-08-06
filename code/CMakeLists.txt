@@ -44,11 +44,6 @@ set(CMAKE_BUILD_TYPE "${BUILD_TYPE_SAVED}")
 add_subdirectory(util)
 add_subdirectory(aws)
 
-# TODO remove following when s3fs fully replaced
-find_package(AWSSDK COMPONENTS config s3 transfer lambda)
-message(STATUS "Found AWS SDK libraries: ${AWSSDK_LINK_LIBRARIES}")
-target_link_libraries(arrow_${BUZZ_BUILD_TYPE} PRIVATE ${AWSSDK_LINK_LIBRARIES})
-
 # we build exec files 1 by 1, acording to the BUZZ_BUILD_FILE var
 set(HIVE_FILES flight-server query-bw-scheduler)
 if("${BUZZ_BUILD_FILE}" IN_LIST HIVE_FILES)

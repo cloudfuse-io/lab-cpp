@@ -6,16 +6,6 @@ locals {
       memory_size = 2048
       environment = {
         MAX_CONCURRENT_DL : 8
-        MAX_CONCURRENT_PROC : 1
-        COLUMN_ID : 16
-        AS_DICT : "true"
-      }
-      additional_policies = [aws_iam_policy.s3-additional-policy.arn]
-    }
-    parquet-arrow-reader2 = {
-      memory_size = 2048
-      environment = {
-        MAX_CONCURRENT_DL : 8
         NB_CONN_INIT : 1
         COLUMN_ID : 16
         AS_DICT : "true"
@@ -26,29 +16,12 @@ locals {
       memory_size = 2048
       environment = {
         MAX_CONCURRENT_DL : 8
-        MAX_CONCURRENT_PROC : 1
-        COLUMN_ID : 16
-      }
-      additional_policies = [aws_iam_policy.s3-additional-policy.arn]
-    }
-    parquet-raw-reader2 = {
-      memory_size = 2048
-      environment = {
-        MAX_CONCURRENT_DL : 8
         NB_CONN_INIT : 1
         COLUMN_ID : 16
       }
       additional_policies = [aws_iam_policy.s3-additional-policy.arn]
     }
     query-bandwidth = {
-      memory_size = 2048
-      environment = {
-        NB_PARALLEL : 12
-        CHUNK_SIZE : 250000
-      }
-      additional_policies = [aws_iam_policy.s3-additional-policy.arn]
-    }
-    query-bandwidth2 = {
       memory_size = 2048
       environment = {
         NB_CHUNCK : 12

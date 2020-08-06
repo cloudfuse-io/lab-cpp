@@ -134,29 +134,14 @@ run-local-query-bandwidth:
 	BUILD_FILE=query-bandwidth \
 	make run-bee-local
 
-run-local-query-bandwidth2: 
-	COMPOSE_TYPE=minio \
-	BUILD_FILE=query-bandwidth2 \
-	make run-bee-local
-
 run-local-parquet-arrow-reader:
 	COMPOSE_TYPE=minio \
 	BUILD_FILE=parquet-arrow-reader \
 	make run-bee-local
 
-run-local-parquet-arrow-reader2:
-	COMPOSE_TYPE=minio \
-	BUILD_FILE=parquet-arrow-reader2 \
-	make run-bee-local
-
 run-local-parquet-raw-reader:
 	COMPOSE_TYPE=minio \
 	BUILD_FILE=parquet-raw-reader \
-	make run-bee-local
-
-run-local-parquet-raw-reader2:
-	COMPOSE_TYPE=minio \
-	BUILD_FILE=parquet-raw-reader2 \
 	make run-bee-local
 
 run-local-mem-alloc-overprov:

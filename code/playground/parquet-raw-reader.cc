@@ -21,149 +21,153 @@
 #include <parquet/api/reader.h>
 #include <parquet/exception.h>
 
-#include <future>
 #include <iostream>
 
 #include "bootstrap.h"
 #include "cust_memory_pool.h"
+#include "downloader.h"
 #include "logger.h"
-#include "s3fs-forked.h"
-#include "scheduler.h"
+#include "parquet-helpers.h"
+#include "partial-file.h"
+#include "sdk-init.h"
 #include "stats.h"
 #include "toolbox.h"
 
 // extern char* je_arrow_malloc_conf;
 
-static const int64_t MAX_CONCURRENT_DL = util::getenv_int("MAX_CONCURRENT_DL", 8);
-static const int64_t MAX_CONCURRENT_PROC = util::getenv_int("MAX_CONCURRENT_PROC", 1);
+static const int MAX_CONCURRENT_DL = util::getenv_int("MAX_CONCURRENT_DL", 8);
+static const int NB_CONN_INIT = util::getenv_int("NB_CONN_INIT", 1);
 static const int64_t COLUMN_ID = util::getenv_int("COLUMN_ID", 16);
 static const auto mem_pool = new arrow::CustomMemoryPool(arrow::default_memory_pool());
 static const bool IS_LOCAL = util::getenv_bool("IS_LOCAL", false);
 
-// Read an entire column chunck by chunck
-void read_single_column_parallel(std::unique_ptr<parquet::ParquetFileReader> reader,
-                                 std::shared_ptr<arrow::fs::fork::S3FileSystem> fs,
-                                 int64_t col_index) {
-  auto col_name = reader->metadata()->schema()->Column(col_index)->name();
-  std::cout << "col processed: " << col_name << std::endl;
-  // start rowgroup read at the same time
-  std::shared_ptr<parquet::ParquetFileReader> shared_reader(std::move(reader));
-  std::vector<std::future<int64_t>> rg_futures;
-  rg_futures.reserve(shared_reader->metadata()->num_row_groups());
-  // shared_reader->metadata()->schema()->Column(col_index)->logical_type();
-  for (int i = 0; i < shared_reader->metadata()->num_row_groups(); i++) {
-    auto fut = std::async(std::launch::async, [col_index, i, shared_reader, fs]() {
-      fs->GetMetrics()->NewEvent("read_start");
-      fs->GetResourceScheduler()->RegisterThreadForSync();
-      auto untyped_col = shared_reader->RowGroup(i)->Column(col_index);
-      // untyped_col->type()
-      // BOOLEAN = 0,
-      // INT32 = 1,
-      // INT64 = 2,
-      // INT96 = 3,
-      // FLOAT = 4,
-      // DOUBLE = 5,
-      // BYTE_ARRAY = 6,
-      // FIXED_LEN_BYTE_ARRAY = 7,
-      // UNDEFINED = 8
-      auto* typed_reader = static_cast<parquet::ByteArrayReader*>(untyped_col.get());
-      constexpr int batch_size = 1024 * 2;
-      int64_t total_values_read = 0;
-      // this should be aligned
-      uint8_t* values;
-      mem_pool->Allocate(batch_size * sizeof(parquet::ByteArray), &values);
-      auto values_casted = reinterpret_cast<parquet::ByteArray*>(values);
-      // util::CountStat<parquet::ByteArray> count_stat;
-      while (typed_reader->HasNext()) {
-        int64_t values_read = 0;
-        typed_reader->ReadBatch(batch_size, nullptr, nullptr, values_casted,
-                                &values_read);
-        // count_stat.Add(values_casted, values_read);
-        total_values_read += values_read;
-      }
-      fs->GetResourceScheduler()->NotifyProcessingDone();
-      fs->GetMetrics()->NewEvent("read_end");
-      // count_stat.Print();
-      return total_values_read;
-    });
-    rg_futures.push_back(std::move(fut));
+// Read a column chunck
+int64_t read_column_chunck(std::shared_ptr<Buzz::PartialFile> rg_file,
+                           std::shared_ptr<parquet::FileMetaData> file_metadata, int rg) {
+  parquet::ReaderProperties props(mem_pool);
+  std::unique_ptr<parquet::ParquetFileReader> reader =
+      parquet::ParquetFileReader::Open(rg_file, props, file_metadata);
+  // reader->metadata()->schema()->Column(col_index)->logical_type();
+  auto untyped_col = reader->RowGroup(rg)->Column(COLUMN_ID);
+  // untyped_col->type()
+  // BOOLEAN = 0,
+  // INT32 = 1,
+  // INT64 = 2,
+  // INT96 = 3,
+  // FLOAT = 4,
+  // DOUBLE = 5,
+  // BYTE_ARRAY = 6,
+  // FIXED_LEN_BYTE_ARRAY = 7,
+  // UNDEFINED = 8
+  auto* typed_reader = static_cast<parquet::ByteArrayReader*>(untyped_col.get());
+  constexpr int batch_size = 1024 * 2;
+  int64_t total_values_read = 0;
+  // this should be aligned
+  uint8_t* values;
+  mem_pool->Allocate(batch_size * sizeof(parquet::ByteArray), &values);
+  auto values_casted = reinterpret_cast<parquet::ByteArray*>(values);
+  // util::CountStat<parquet::ByteArray> count_stat;
+  while (typed_reader->HasNext()) {
+    int64_t values_read = 0;
+    typed_reader->ReadBatch(batch_size, nullptr, nullptr, values_casted, &values_read);
+    // count_stat.Add(values_casted, values_read);
+    total_values_read += values_read;
   }
-  // collect rowgroup results
-  std::vector<int64_t> values_read_by_rg;
-  values_read_by_rg.reserve(shared_reader->metadata()->num_row_groups());
-  for (auto& rg_future : rg_futures) {
-    auto values_read = rg_future.get();
-    values_read_by_rg.push_back(values_read);
-  }
-
-  std::cout << "values_read_by_rg:";
-  for (auto rows : values_read_by_rg) {
-    std::cout << rows << ",";
-  }
-  std::cout << std::endl;
+  // count_stat.Print();
+  return total_values_read;
 }
 
 static aws::lambda_runtime::invocation_response my_handler(
-    aws::lambda_runtime::invocation_request const& req) {
-  auto scheduler =
-      std::make_shared<util::ResourceScheduler>(MAX_CONCURRENT_DL, MAX_CONCURRENT_PROC);
-  auto metrics = std::make_shared<util::MetricsManager>();
+    aws::lambda_runtime::invocation_request const& req, const SdkOptions& options) {
+  auto wait_for_foot_start = util::time::now();
+  auto synchronizer = std::make_shared<Synchronizer>();
+  auto metrics_manager = std::make_shared<util::MetricsManager>();
+  // metrics_manager->Reset();
+  auto downloader = std::make_shared<Downloader>(synchronizer, MAX_CONCURRENT_DL,
+                                                 metrics_manager, options);
 
-  //// setup s3fs ////
-  arrow::fs::fork::S3Options options = arrow::fs::fork::S3Options::Defaults();
-  options.region = "eu-west-1";
-  if (IS_LOCAL) {
-    options.endpoint_override = "minio:9000";
-    std::cout << "endpoint_override=" << options.endpoint_override << std::endl;
-    options.scheme = "http";
-  }
-  PARQUET_ASSIGN_OR_THROW(
-      auto fs, arrow::fs::fork::S3FileSystem::Make(options, scheduler, metrics));
+  S3Path file_path{"bb-test-data-dev", "bid-large.parquet"};
 
-  std::vector<std::string> file_names{
-      "bb-test-data-dev/bid-large.parquet",
-      // "bb-test-data-dev/bid-large-arrow-rg-500k.parquet",
-      // "bb-test-data-dev/bid-large-arrow-rg-1m.parquet",
-      // "bb-test-data-dev/bid-large-nolist-rg-2m.parquet",
-      // "bb-test-data-dev/bid-large-nolist-rg-4m.parquet",
-      // "bb-test-data-dev/bid-large-nolist-rg-full.parquet",
-  };
+  auto file_metadata =
+      Buzz::GetMetadata(downloader, synchronizer, mem_pool, file_path, NB_CONN_INIT);
 
-  for (auto&& file_name : file_names) {
-    std::cout << ">>>> file_name: " << file_name << std::endl;
-    //// setup reader ////
-    PARQUET_ASSIGN_OR_THROW(auto infile, fs->OpenInputFile(file_name));
-    parquet::ReaderProperties props(mem_pool);
+  auto wait_for_foot = util::get_duration_ms(wait_for_foot_start, util::time::now());
 
-    std::unique_ptr<parquet::ParquetFileReader> parquet_reader =
-        parquet::ParquetFileReader::Open(infile, props, nullptr);
-
-    // Get the File MetaData
-    std::shared_ptr<parquet::FileMetaData> file_metadata = parquet_reader->metadata();
-    std::cout << "file_metadata->num_rows:" << file_metadata->num_rows() << std::endl;
-
-    //// read from s3 ////
-    read_single_column_parallel(std::move(parquet_reader), fs, COLUMN_ID);
-    std::cout << "HUGE_ALLOC_THRESHOLD_BYTES:" << arrow::HUGE_ALLOC_THRESHOLD_BYTES
-              << std::endl;
-    std::cout << "arrow::default_memory_pool()->bytes_allocated():"
-              << arrow::default_memory_pool()->bytes_allocated() << std::endl;
-    std::cout << "mem_pool->bytes_allocated():" << mem_pool->bytes_allocated()
-              << std::endl;
-    std::cout << "arrow::default_memory_pool()->max_memory():"
-              << arrow::default_memory_pool()->max_memory() << std::endl;
-    std::cout << "mem_pool->copied_bytes():" << mem_pool->copied_bytes() << std::endl;
+  // Download column chuncks
+  for (int i = 0; i < file_metadata->num_row_groups(); i++) {
+    // TODO a more progressive scheduling of new connections
+    Buzz::DownloadColumnChunck(downloader, file_metadata, file_path, i, COLUMN_ID);
   }
 
-  fs->GetMetrics()->Print();
+  // Process chuncks
+  int downloaded_chuncks = 0;
+  int64_t rows_read = 0;
+  int64_t wait_for_dl = 0;
+  std::vector<int64_t> wait_durations;
+  wait_durations.reserve(file_metadata->num_row_groups());
+  std::vector<int64_t> processing_durations;
+  processing_durations.reserve(file_metadata->num_row_groups());
+  metrics_manager->NewEvent("start_scheduler");
+  while (downloaded_chuncks < file_metadata->num_row_groups()) {
+    auto wait_for_dl_start = util::time::now();
+    synchronizer->wait();
+    auto wait_duration = util::get_duration_ms(wait_for_dl_start, util::time::now());
+    wait_durations.push_back(wait_duration);
+    wait_for_dl += wait_duration;
+    auto col_chunck_files = Buzz::GetColumnChunckFiles(downloader);
+    for (auto& col_chunck_file : col_chunck_files) {
+      auto start_processing = util::time::now();
+      metrics_manager->NewEvent("starting_proc");
+      // read chunck
+      rows_read += read_column_chunck(col_chunck_file.file, file_metadata,
+                                      col_chunck_file.row_group);
+      downloaded_chuncks++;
+      processing_durations.push_back(
+          util::get_duration_ms(start_processing, util::time::now()));
+    }
+  }
+  metrics_manager->NewEvent("processings_finished");
+
+  std::cout << "downloaded_chuncks:" << downloaded_chuncks << "/rows_read:" << rows_read
+            << std::endl;
+  metrics_manager->Print();
+
+  std::cout << "wait_dur:";
+  for (auto wait_dur : wait_durations) {
+    std::cout << wait_dur << ",";
+  }
+  std::cout << std::endl;
+  std::cout << "proc_dur:";
+  for (auto proc_dur : processing_durations) {
+    std::cout << proc_dur << ",";
+  }
+  std::cout << std::endl;
+
+  auto entry = Buzz::logger::NewEntry("wait_s3");
+  entry.IntField("nb_init", NB_CONN_INIT);
+  entry.IntField("footer", wait_for_foot);
+  entry.IntField("dl", wait_for_dl);
+  entry.IntField("total", wait_for_foot + wait_for_dl);
+  entry.Log();
 
   return aws::lambda_runtime::invocation_response::success("Done", "text/plain");
 }
 
 /** LAMBDA MAIN **/
 int main() {
-  arrow::fs::fork::S3GlobalOptions options;
-  options.log_level = arrow::fs::fork::S3LogLevel::Warn;
-  PARQUET_THROW_NOT_OK(InitializeS3(options));
-  bootstrap(my_handler);
+  InitializeAwsSdk(AwsSdkLogLevel::Off);
+  // init s3 client
+  SdkOptions options;
+  options.region = "eu-west-1";
+  if (IS_LOCAL) {
+    options.endpoint_override = "minio:9000";
+    std::cout << "endpoint_override=" << options.endpoint_override << std::endl;
+    options.scheme = "http";
+  }
+  bootstrap([&options](aws::lambda_runtime::invocation_request const& req) {
+    return my_handler(req, options);
+  });
+  // this is mainly usefull to avoid Valgrind errors as Lambda do not guaranty the
+  // execution of this code before killing the container
+  FinalizeAwsSdk();
 }

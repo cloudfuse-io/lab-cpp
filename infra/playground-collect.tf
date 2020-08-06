@@ -18,11 +18,11 @@ module "mem-bandwidth-lambda" {
   }
 }
 
-module "query-bandwidth2-lambda" {
+module "query-bandwidth-lambda" {
   source = "./lambda"
 
-  function_base_name = "query-bandwidth2-static"
-  filename           = "${local.lambda_build_dir}/buzz-query-bandwidth2-static.zip"
+  function_base_name = "query-bandwidth-static"
+  filename           = "${local.lambda_build_dir}/buzz-query-bandwidth-static.zip"
   handler            = "N/A"
   memory_size        = 2048
   timeout            = 10
@@ -46,10 +46,10 @@ module "mem-bandwidth-scheduler" {
   schedule_expression = "cron(0 * * * ? *)"
 }
 
-module "query-bandwidth2-scheduler" {
+module "query-bandwidth-scheduler" {
   source = "./scheduler"
 
-  function_name       = module.query-bandwidth2-lambda.lambda_name
-  function_arn        = module.query-bandwidth2-lambda.lambda_arn
+  function_name       = module.query-bandwidth-lambda.lambda_name
+  function_arn        = module.query-bandwidth-lambda.lambda_arn
   schedule_expression = "cron(10 * * * ? *)"
 }

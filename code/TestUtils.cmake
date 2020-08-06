@@ -1,3 +1,13 @@
+FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG        release-1.8.0
+)
+FetchContent_MakeAvailable(googletest)
+enable_testing()
+include(GoogleTest)
+
+
 # this function builds the SRCS test as NAME with arrow and the DEPS libraries linked
 function(package_add_test)
     cmake_parse_arguments(

@@ -6,19 +6,9 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/executables)
 include(FetchContent)
 
 if("${BUZZ_BUILD_TESTS}" STREQUAL "ON")
-  FetchContent_Declare(
-    googletest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG        release-1.8.0
-  )
-  FetchContent_MakeAvailable(googletest)
-  enable_testing()
-  include(GoogleTest)
-  # custom test utils:
   set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}" ${CMAKE_MODULE_PATH})
   include(TestUtils)
 endif()
-
 
 
 # list all the targets created here to promote them to CXX17

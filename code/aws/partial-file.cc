@@ -83,10 +83,4 @@ Status PartialFile::Seek(int64_t position) {
   return Status::OK();
 }
 
-arrow::Future<std::shared_ptr<arrow::Buffer>> PartialFile::ReadAsync(int64_t position,
-                                                                     int64_t nbytes) {
-  return arrow::Future<std::shared_ptr<arrow::Buffer>>::MakeFinished(
-      ReadAt(position, nbytes));
-}
-
 }  // namespace Buzz

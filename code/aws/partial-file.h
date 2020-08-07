@@ -46,8 +46,6 @@ class PartialFile : public arrow::io::RandomAccessFile {
   Result<int64_t> Read(int64_t nbytes, void* out) override;
   Result<std::shared_ptr<arrow::Buffer>> Read(int64_t nbytes) override;
   Status Seek(int64_t position) override;
-  arrow::Future<std::shared_ptr<arrow::Buffer>> ReadAsync(int64_t position,
-                                                          int64_t nbytes) override;
 
  private:
   std::vector<FileChunck> chuncks_;

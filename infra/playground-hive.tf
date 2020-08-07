@@ -34,7 +34,7 @@ module "query-bw-scheduler-fargate" {
   subnets                     = module.vpc.public_subnets
   environment = [{
     name  = "BEE_FUNCTION_NAME",
-    value = module.query-bandwidth2-bee.lambda_name
+    value = module.query-bandwidth-bee.lambda_name
     }, {
     name  = "NB_PARALLEL",
     value = "64"
@@ -46,11 +46,11 @@ module "query-bw-scheduler-fargate" {
   depends_on_image_push = null_resource.query-bw-scheduler-push.id
 }
 
-module "query-bandwidth2-bee" {
+module "query-bandwidth-bee" {
   source = "./lambda"
 
-  function_base_name = "query-bandwidth2-static-bee"
-  filename           = "${local.lambda_build_dir}/buzz-query-bandwidth2-static.zip"
+  function_base_name = "query-bandwidth-static-bee"
+  filename           = "${local.lambda_build_dir}/buzz-query-bandwidth-static.zip"
   handler            = "N/A"
   memory_size        = 2048
   timeout            = 10

@@ -23,10 +23,14 @@ module "env" {
   source = "./env"
 }
 
-provider "http" {}
+provider "http" {
+  version = "~> 1.2"
+}
 
 data "http" "icanhazip" {
   url = "http://icanhazip.com"
 }
 
-provider "null" {}
+provider "null" {
+  version = "~> 2.1"
+}

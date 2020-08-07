@@ -209,7 +209,7 @@ run-local-query-bw-scheduler:
 ## bee deployment commands
 
 # this defaults the file deployed to the generic playground
-GEN_PLAY_FILE ?= query-bandwidth2
+GEN_PLAY_FILE ?= query-bandwidth
 
 deploy-bee:
 	BUILD_FILE=${GEN_PLAY_FILE} make package-bee
@@ -235,8 +235,8 @@ deploy-run-bee: deploy-bee
 	sleep 2
 	make run-bee
 
-deploy-bench-query-bandwidth2:
-	GEN_PLAY_FILE=query-bandwidth2 make deploy-bee 
+deploy-bench-query-bandwidth:
+	GEN_PLAY_FILE=query-bandwidth make deploy-bee 
 	@# change the unused param "handler" to reset lambda state
 	number=1 ; while [[ $$number -le 1 ]] ; do \
 		aws lambda update-function-configuration \
@@ -244,15 +244,15 @@ deploy-bench-query-bandwidth2:
 			--handler "N/A-$$number" \
 			--region ${REGION} \
 			--profile bbdev  > /dev/null 2>&1; \
-		make run-bee 2>&- | grep '^{.*query_bandwidth2.*}$$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .run]|@csv'; \
-		make run-bee 2>&- | grep '^{.*query_bandwidth2.*}$$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .run]|@csv'; \
-		make run-bee 2>&- | grep '^{.*query_bandwidth2.*}$$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .run]|@csv'; \
-		make run-bee 2>&- | grep '^{.*query_bandwidth2.*}$$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .run]|@csv'; \
+		make run-bee 2>&- | grep '^{.*query_bandwidth.*}$$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .run]|@csv'; \
+		make run-bee 2>&- | grep '^{.*query_bandwidth.*}$$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .run]|@csv'; \
+		make run-bee 2>&- | grep '^{.*query_bandwidth.*}$$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .run]|@csv'; \
+		make run-bee 2>&- | grep '^{.*query_bandwidth.*}$$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .run]|@csv'; \
 		((number = number + 1)) ; \
 	done
 
-deploy-bench-parquet-raw-reader2:
-	GEN_PLAY_FILE=parquet-raw-reader2 make deploy-bee 
+deploy-bench-parquet-raw-reader:
+	GEN_PLAY_FILE=parquet-raw-reader make deploy-bee 
 	@# change the unused param "handler" to reset lambda state
 	number=1 ; while [[ $$number -le 25 ]] ; do \
 		aws lambda update-function-configuration \
@@ -265,7 +265,7 @@ deploy-bench-parquet-raw-reader2:
 		((number = number + 1)) ; \
 	done
 
-# | grep '^{.*query_bandwidth2.*}$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .CONTAINER_RUNS]|@csv'
+# | grep '^{.*query_bandwidth.*}$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .CONTAINER_RUNS]|@csv'
 
 ## hive deployment commands
 
@@ -309,7 +309,7 @@ init-dev:
 
 force-deploy:
 	BUILD_FILE=query-bw-scheduler IMAGE_TAG="${GIT_REVISION}" make dockerify-hive
-	BUILD_FILE=query-bandwidth2 make package-bee
+	BUILD_FILE=query-bandwidth make package-bee
 	BUILD_FILE=mem-bandwidth make package-bee
 	BUILD_FILE=${GEN_PLAY_FILE} make package-bee
 	@echo "DEPLOYING ${GIT_REVISION} to ${ENV} ..."

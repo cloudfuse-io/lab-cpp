@@ -6,6 +6,7 @@ if [ "$1" = 'build' ]; then
     cd /build
     cmake /source -DCMAKE_BUILD_TYPE=Release \
       -DARROW_BUILD_STATIC=ON \
+      -DARROW_SIMD_LEVEL=SSE4_2 \
       -DARROW_BUILD_SHARED=OFF \
       -DARROW_BUILD_TESTS=OFF \
       -DARROW_CXXFLAGS="-ldl -g" \

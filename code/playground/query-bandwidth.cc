@@ -61,7 +61,7 @@ static aws::lambda_runtime::invocation_response my_handler(
   metrics_manager->NewEvent("handler_end");
   // logging all results
   metrics_manager->Print();
-  auto entry = Buzz::logger::NewEntry("query_bandwidth2");
+  auto entry = Buzz::logger::NewEntry("query_bandwidth");
   entry.IntField("NB_CHUNCK", NB_CHUNCK);
   entry.IntField("MAX_PARALLEL", MAX_PARALLEL);
   entry.IntField("CHUNK_SIZE", CHUNK_SIZE);

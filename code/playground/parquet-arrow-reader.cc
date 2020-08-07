@@ -50,25 +50,22 @@ Result<int64_t> read_column_chunck(std::shared_ptr<::arrow::io::RandomAccessFile
   parquet::arrow::FileReaderBuilder builder;
   parquet::ReaderProperties parquet_props(mem_pool);
   PARQUET_THROW_NOT_OK(builder.Open(rg_file, parquet_props, file_metadata));
-  // here the footer gets downloaded
   builder.memory_pool(mem_pool);
   auto arrow_props = parquet::ArrowReaderProperties();
   arrow_props.set_read_dictionary(COLUMN_ID, AS_DICT);
   builder.properties(arrow_props);
   PARQUET_THROW_NOT_OK(builder.Build(&reader));
 
-  // start rowgroup read at the same time
   std::shared_ptr<arrow::ChunkedArray> array;
   PARQUET_THROW_NOT_OK(reader->RowGroup(rg)->Column(COLUMN_ID)->Read(&array));
-  // collect rowgroup results
   return array->length();
 }
 
 static aws::lambda_runtime::invocation_response my_handler(
     aws::lambda_runtime::invocation_request const& req, const SdkOptions& options) {
-  auto wait_for_foot_start = util::time::now();
   auto synchronizer = std::make_shared<Synchronizer>();
   auto metrics_manager = std::make_shared<util::MetricsManager>();
+  metrics_manager->EnterPhase("wait_foot");
   // metrics_manager->Reset();
   auto downloader = std::make_shared<Downloader>(synchronizer, MAX_CONCURRENT_DL,
                                                  metrics_manager, options);
@@ -78,7 +75,7 @@ static aws::lambda_runtime::invocation_response my_handler(
   auto file_metadata =
       Buzz::GetMetadata(downloader, synchronizer, mem_pool, file_path, NB_CONN_INIT);
 
-  auto wait_for_foot = util::get_duration_ms(wait_for_foot_start, util::time::now());
+  metrics_manager->ExitPhase("wait_foot");
   std::cout << "col processed: " << file_metadata->schema()->Column(COLUMN_ID)->name()
             << std::endl;
 
@@ -91,29 +88,21 @@ static aws::lambda_runtime::invocation_response my_handler(
   // Process chuncks
   int downloaded_chuncks = 0;
   int64_t rows_read = 0;
-  int64_t wait_for_dl = 0;
-  std::vector<int64_t> wait_durations;
-  wait_durations.reserve(file_metadata->num_row_groups());
-  std::vector<int64_t> processing_durations;
-  processing_durations.reserve(file_metadata->num_row_groups());
   metrics_manager->NewEvent("start_scheduler");
   while (downloaded_chuncks < file_metadata->num_row_groups()) {
-    auto wait_for_dl_start = util::time::now();
+    metrics_manager->EnterPhase("wait_dl");
     synchronizer->wait();
-    auto wait_duration = util::get_duration_ms(wait_for_dl_start, util::time::now());
-    wait_durations.push_back(wait_duration);
-    wait_for_dl += wait_duration;
+    metrics_manager->ExitPhase("wait_dl");
     auto col_chunck_files = Buzz::GetColumnChunckFiles(downloader);
     for (auto& col_chunck_file : col_chunck_files) {
-      auto start_processing = util::time::now();
+      metrics_manager->EnterPhase("proc");
       metrics_manager->NewEvent("starting_proc");
       // read chunck
       rows_read += read_column_chunck(col_chunck_file.file, file_metadata,
                                       col_chunck_file.row_group)
                        .ValueOrDie();
       downloaded_chuncks++;
-      processing_durations.push_back(
-          util::get_duration_ms(start_processing, util::time::now()));
+      metrics_manager->ExitPhase("proc");
     }
   }
   metrics_manager->NewEvent("processings_finished");
@@ -121,24 +110,6 @@ static aws::lambda_runtime::invocation_response my_handler(
   std::cout << "downloaded_chuncks:" << downloaded_chuncks << "/rows_read:" << rows_read
             << std::endl;
   metrics_manager->Print();
-
-  std::cout << "wait_dur:";
-  for (auto wait_dur : wait_durations) {
-    std::cout << wait_dur << ",";
-  }
-  std::cout << std::endl;
-  std::cout << "proc_dur:";
-  for (auto proc_dur : processing_durations) {
-    std::cout << proc_dur << ",";
-  }
-  std::cout << std::endl;
-
-  auto entry = Buzz::logger::NewEntry("wait_s3");
-  entry.IntField("nb_init", NB_CONN_INIT);
-  entry.IntField("footer", wait_for_foot);
-  entry.IntField("dl", wait_for_dl);
-  entry.IntField("total", wait_for_foot + wait_for_dl);
-  entry.Log();
 
   return aws::lambda_runtime::invocation_response::success("Done", "text/plain");
 }

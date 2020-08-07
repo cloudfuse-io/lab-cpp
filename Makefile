@@ -254,14 +254,14 @@ deploy-bench-query-bandwidth:
 deploy-bench-parquet-raw-reader:
 	GEN_PLAY_FILE=parquet-raw-reader make deploy-bee 
 	@# change the unused param "handler" to reset lambda state
-	number=1 ; while [[ $$number -le 25 ]] ; do \
+	number=1 ; while [[ $$number -le 20 ]] ; do \
 		aws lambda update-function-configuration \
 			--function-name buzz-cpp-generic-playground-static-dev \
 			--handler "N/A-$$number" \
 			--region ${REGION} \
 			--profile bbdev  > /dev/null 2>&1; \
-		make run-bee 2>&- | grep '^{.*wait_s3.*}$$' | jq -r '[.nb_init, .footer, .dl, .total, .run]|@csv'; \
-		make run-bee 2>&- | grep '^{.*wait_s3.*}$$' | jq -r '[.nb_init, .footer, .dl, .total, .run]|@csv'; \
+		make run-bee 2>&- | grep '^{.*phase_durations.*}$$' | jq -r '[.wait_foot, .wait_dl, .proc, .run]|@csv'; \
+		make run-bee 2>&- | grep '^{.*phase_durations.*}$$' | jq -r '[.wait_foot, .wait_dl, .proc, .run]|@csv'; \
 		((number = number + 1)) ; \
 	done
 

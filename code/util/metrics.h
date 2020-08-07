@@ -43,6 +43,14 @@ class MetricsManager {
   void NewInitConnection(std::string result, int64_t total_duration_ms,
                          int64_t resolution_time_ms, int64_t blocking_time_ms);
 
+  /// Indicate that the code entered a named phase. Used to measure the time spent in that
+  /// phase. Not thread safe.
+  void EnterPhase(std::string name);
+
+  /// Indicate that the code exited a named phase. Used to measure the time spent in that
+  /// phase. Not thread safe.
+  void ExitPhase(std::string name);
+
   /// Empty the manager to start tracking a new execution that maintained previous context
   void Reset();
 

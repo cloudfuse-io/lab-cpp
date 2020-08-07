@@ -78,6 +78,11 @@ struct InitConnection {
   int64_t resolution_time_ms;
   int64_t blocking_time_ms;
 };
+
+struct PhaseDurations {
+  std::vector<int64_t> durations;
+  std::optional<time::time_point> started;
+};
 }  // namespace
 
 class MetricsManager::Impl {
@@ -85,6 +90,7 @@ class MetricsManager::Impl {
   concurrent_vector<MetricEvent> events_;
   concurrent_vector<Download> downloads_;
   concurrent_vector<InitConnection> init_connections_;
+  std::map<std::string, PhaseDurations> phase_durations_map_;
   time::time_point ref_time_ = time::now();
 
   void PrintEvents() const {
@@ -137,6 +143,29 @@ class MetricsManager::Impl {
     }
   }
 
+  void PrintPhases() const {
+    std::vector<std::pair<std::string, int64_t>> total_durations;
+    for (const auto& phase_durations_kv : phase_durations_map_) {
+      // compute total duration of the phase
+      int64_t total_dur = 0;
+      for (auto dur : phase_durations_kv.second.durations) {
+        total_dur += dur;
+      }
+      total_durations.emplace_back(phase_durations_kv.first, total_dur);
+      // print the detail of the phase durations
+      std::cout << phase_durations_kv.first << ":";
+      for (auto dur : phase_durations_kv.second.durations) {
+        std::cout << dur << ",";
+      }
+      std::cout << std::endl;
+    }
+    auto entry = Buzz::logger::NewEntry("phase_durations");
+    for (auto& duration : total_durations) {
+      entry.IntField(duration.first.data(), duration.second);
+    }
+    entry.Log();
+  }
+
   void NewDownload(int64_t duration_ms, int64_t size) {
     Download download{
         time::now(),
@@ -167,6 +196,33 @@ class MetricsManager::Impl {
     init_connections_.push_back(init_connection);
   }
 
+  void EnterPhase(std::string name) {
+    auto item = phase_durations_map_.find(name);
+    if (item == phase_durations_map_.end()) {
+      phase_durations_map_.emplace(name, PhaseDurations{{}, time::now()}).first;
+    } else if (item->second.started.has_value()) {
+      // TODO return error
+      std::cout << "Phase already entered" << std::endl;
+    } else {
+      item->second.started = time::now();
+    }
+  }
+
+  void ExitPhase(std::string name) {
+    auto item = phase_durations_map_.find(name);
+    if (item == phase_durations_map_.end()) {
+      // TODO return error
+      std::cout << "Phase never entered" << std::endl;
+    } else if (item->second.started.has_value()) {
+      item->second.durations.push_back(
+          util::get_duration_ms(item->second.started.value(), time::now()));
+      item->second.started = {};
+    } else {
+      // TODO return error
+      std::cout << "Phase already exited" << std::endl;
+    }
+  }
+
   void Reset() {
     ref_time_ = time::now();
     events_.clear();
@@ -182,6 +238,7 @@ void MetricsManager::Print() const {
   impl_->PrintEvents();
   impl_->PrintInitConnections();
   // impl_->PrintDownloads();
+  impl_->PrintPhases();
 }
 
 void MetricsManager::NewEvent(std::string type) { impl_->NewEvent(type); }
@@ -195,6 +252,10 @@ void MetricsManager::NewInitConnection(std::string result, int64_t total_duratio
   impl_->NewInitConnection(std::move(result), total_duration_ms, resolution_time_ms,
                            blocking_time_ms);
 }
+
+void MetricsManager::EnterPhase(std::string name) { impl_->EnterPhase(name); }
+
+void MetricsManager::ExitPhase(std::string name) { impl_->ExitPhase(name); }
 
 void MetricsManager::Reset() { impl_->Reset(); }
 

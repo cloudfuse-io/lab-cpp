@@ -22,6 +22,7 @@
 
 #include <map>
 #include <optional>
+#include <set>
 
 namespace Buzz {
 

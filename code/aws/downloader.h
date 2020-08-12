@@ -27,7 +27,6 @@
 
 #include "async_queue.h"
 #include "metrics.h"
-#include "sdk-init.h"
 
 #if !defined(BUZZ_STATUS_ABORT)
 #define BUZZ_STATUS_ABORT 1

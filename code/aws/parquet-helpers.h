@@ -18,22 +18,12 @@
 #pragma once
 
 #include <arrow/api.h>
-#include <arrow/compute/api.h>
-#include <arrow/io/api.h>
-#include <aws/lambda-runtime/runtime.h>
 #include <parquet/arrow/reader.h>
-#include <parquet/exception.h>
 
-#include <future>
 #include <iostream>
 
-#include "bootstrap.h"
-#include "cust_memory_pool.h"
 #include "downloader.h"
-#include "logger.h"
 #include "partial-file.h"
-#include "sdk-init.h"
-#include "toolbox.h"
 
 namespace Buzz {
 

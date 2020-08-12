@@ -41,6 +41,7 @@ Result<std::shared_ptr<arrow::Buffer>> PartialFile::ReadAt(int64_t position,
     if (position >= chunck.start_position &&
         position < chunck.start_position + chunck.data->size()) {
       if (position + nbytes > chunck.start_position + chunck.data->size()) {
+        // TODO better debug printing
         std::cout << "read " << position << "-" << position + nbytes << std::endl;
         std::cout << "from " << chunck.start_position << "-"
                   << chunck.start_position + chunck.data->size() << std::endl;
@@ -51,6 +52,7 @@ Result<std::shared_ptr<arrow::Buffer>> PartialFile::ReadAt(int64_t position,
       return std::make_shared<arrow::Buffer>(chunck.data, offset, nbytes);
     }
   }
+  // TODO better debug printing
   std::cout << "read " << position << "-" << position + nbytes << std::endl;
   std::cout << "from :" << std::endl;
   for (auto& chunck : chuncks_) {

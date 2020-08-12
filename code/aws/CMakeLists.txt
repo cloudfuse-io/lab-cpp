@@ -1,7 +1,6 @@
 add_library(buzz-aws STATIC
   sdk-init.cc
   downloader.cc
-  partial-file.cc
   curl/HttpClientFactory.cpp
   curl/HttpClient.cpp
   curl/HandleContainer.cpp)

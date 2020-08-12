@@ -1,9 +1,9 @@
 add_library (buzz-util STATIC
   cust_memory_pool.cc
   async_queue.cc
+  partial-file.cc
   metrics.cc
-  logger.cc
-  stats.cc)
+  logger.cc)
 target_include_directories(buzz-util PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_arrow(buzz-util)
 list(APPEND BUZZ_ALL buzz-util)

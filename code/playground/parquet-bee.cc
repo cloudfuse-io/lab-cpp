@@ -41,7 +41,6 @@ static aws::lambda_runtime::invocation_response my_handler(
                            true,
                            {MetricAggretation{AggType::SUM, "cpm"},
                             MetricAggretation{AggType::SUM, "cpmUplift"}}});
-  std::cout << "Query executed" << std::endl;
   return aws::lambda_runtime::invocation_response::success("Done", "text/plain");
 }
 

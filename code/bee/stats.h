@@ -17,14 +17,13 @@
 
 #pragma once
 
-#include <arrow/status.h>
 #include <parquet/api/schema.h>
+#include <result.h>
 
 #include <string_view>
 #include <unordered_map>
 
-namespace util {
-using namespace arrow;
+namespace Buzz {
 
 template <typename Key>
 struct HashingTraits {
@@ -57,4 +56,5 @@ class CountStat {
  private:
   std::unordered_map<Key, int64_t, Hash, Equal> counts_;
 };
-}  // namespace util
+
+}  // namespace Buzz

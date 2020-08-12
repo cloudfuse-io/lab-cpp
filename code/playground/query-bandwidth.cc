@@ -7,6 +7,8 @@
 #include "sdk-init.h"
 #include "toolbox.h"
 
+using namespace Buzz;
+
 static int NB_CHUNCK = util::getenv_int("NB_CHUNCK", 12);
 static int MAX_PARALLEL = util::getenv_int("MAX_PARALLEL", 12);
 static int64_t CHUNK_SIZE = util::getenv_int("CHUNK_SIZE", 250000);
@@ -16,7 +18,7 @@ static bool IS_LOCAL = util::getenv_bool("IS_LOCAL", false);
 static aws::lambda_runtime::invocation_response my_handler(
     const aws::lambda_runtime::invocation_request& req, const SdkOptions& options) {
   auto synchronizer = std::make_shared<Synchronizer>();
-  auto metrics_manager = std::make_shared<util::MetricsManager>();
+  auto metrics_manager = std::make_shared<MetricsManager>();
   // metrics_manager->Reset();
   Downloader downloader{synchronizer, MAX_PARALLEL, metrics_manager, options};
   // init connections
@@ -31,7 +33,7 @@ static aws::lambda_runtime::invocation_response my_handler(
     inits_completed += results.size();
   }
   // start download
-  auto start_time = util::time::now();
+  auto start_time = time::now();
   for (int i = 0; i < NB_CHUNCK; i++) {
     downloader.ScheduleDownload({i * CHUNK_SIZE,
                                  (i + 1) * CHUNK_SIZE - 1,
@@ -56,12 +58,12 @@ static aws::lambda_runtime::invocation_response my_handler(
       downloaded_bytes += response.raw_data->size();
     }
   }
-  auto end_time = util::time::now();
+  auto end_time = time::now();
   auto total_duration = util::get_duration_ms(start_time, end_time);
   metrics_manager->NewEvent("handler_end");
   // logging all results
   metrics_manager->Print();
-  auto entry = Buzz::logger::NewEntry("query_bandwidth");
+  auto entry = logger::NewEntry("query_bandwidth");
   entry.IntField("NB_CHUNCK", NB_CHUNCK);
   entry.IntField("MAX_PARALLEL", MAX_PARALLEL);
   entry.IntField("CHUNK_SIZE", CHUNK_SIZE);

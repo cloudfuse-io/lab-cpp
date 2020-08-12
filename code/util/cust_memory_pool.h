@@ -18,8 +18,7 @@
 #pragma once
 
 #include <arrow/api.h>
-#include <arrow/result.h>
-#include <arrow/status.h>
+#include <result.h>
 
 #include <string>
 
@@ -28,7 +27,7 @@
 // #define ACTIVATE_ALLOCATION_LINKING
 // #define ACTIVATE_ALLOCATION_PRINTING
 
-namespace arrow {
+namespace Buzz {
 
 inline constexpr int64_t HUGE_ALLOC_THRESHOLD_BYTES = 1024 * 1024;
 inline constexpr int64_t SMALL_ALLOC_THRESHOLD_BYTES = 256 * 1024;
@@ -38,9 +37,9 @@ inline constexpr int64_t HUGE_ALLOC_RUNWAY_SIZE_BYTES = 1024 * 1024 * 1024;
 ///
 /// Optimizes large allocations an re-allocations
 /// Forwards small allocations to inner allocator
-class ARROW_EXPORT CustomMemoryPool : public MemoryPool {
+class ARROW_EXPORT CustomMemoryPool : public arrow::MemoryPool {
  public:
-  explicit CustomMemoryPool(MemoryPool* pool);
+  explicit CustomMemoryPool(arrow::MemoryPool* pool);
   ~CustomMemoryPool() override;
 
   Status Allocate(int64_t size, uint8_t** out) override;
@@ -61,4 +60,4 @@ class ARROW_EXPORT CustomMemoryPool : public MemoryPool {
   std::unique_ptr<CustomMemoryPoolImpl> impl_;
 };
 
-}  // namespace arrow
+}  // namespace Buzz

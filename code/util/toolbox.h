@@ -23,15 +23,17 @@
 #include <cstring>
 #include <string>
 
+namespace Buzz {
+
+using time = std::chrono::high_resolution_clock;
+
 namespace util {
 
-inline int64_t get_duration_ms(std::chrono::_V2::system_clock::time_point start,
-                               std::chrono::_V2::system_clock::time_point end) {
+inline int64_t get_duration_ms(time::time_point start, time::time_point end) {
   return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 }
 
-inline int64_t get_duration_micro(std::chrono::_V2::system_clock::time_point start,
-                                  std::chrono::_V2::system_clock::time_point end) {
+inline int64_t get_duration_micro(time::time_point start, time::time_point end) {
   return std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 }
 
@@ -59,8 +61,6 @@ inline const char* getenv(const char* name, const char* def) {
   return raw_var;
 }
 
-using time = std::chrono::high_resolution_clock;
-
 /// generate a "random" char from the current time low bits
 inline char random_alphanum() {
   constexpr char charset[] =
@@ -72,3 +72,5 @@ inline char random_alphanum() {
 }
 
 }  // namespace util
+
+}  // namespace Buzz

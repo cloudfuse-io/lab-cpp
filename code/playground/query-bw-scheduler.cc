@@ -6,6 +6,8 @@
 #include "sdk-init.h"
 #include "toolbox.h"
 
+using namespace Buzz;
+
 static bool IS_LOCAL = false;  // util::getenv_bool("IS_LOCAL", false);
 static int NB_PARALLEL = util::getenv_int("NB_PARALLEL", 1);
 static int NB_INVOKE = util::getenv_int("NB_INVOKE", 1);

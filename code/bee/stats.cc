@@ -19,8 +19,7 @@
 
 #include <iostream>
 
-namespace util {
-using namespace arrow;
+namespace Buzz {
 
 constexpr int MAP_SIZE = 1024 * 16;
 
@@ -48,4 +47,4 @@ template class CountStat<parquet::ByteArray>;
 template class CountStat<float>;
 // ...
 
-}  // namespace util
+}  // namespace Buzz

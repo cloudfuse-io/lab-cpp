@@ -22,11 +22,13 @@
 #include <aws/core/utils/stream/PreallocatedStreamBuf.h>
 #include <aws/s3/model/DeleteObjectRequest.h>
 #include <aws/s3/model/GetObjectRequest.h>
+#include <result.h>
+#include <toolbox.h>
 
 #include <cassert>
 #include <string>
 
-#include "toolbox.h"
+namespace Buzz {
 
 namespace {
 std::string FormatRange(std::optional<int64_t> start, int64_t end) {
@@ -87,7 +89,7 @@ struct ObjectRangeResult {
 Result<ObjectRangeResult> GetObjectRange(
     std::shared_ptr<Aws::S3::S3Client> client, const S3Path& path,
     std::optional<int64_t> start, int64_t end,
-    std::shared_ptr<util::MetricsManager> metrics_manager) {
+    std::shared_ptr<MetricsManager> metrics_manager) {
   auto nbytes = CalculateLength(start, end);
   ARROW_ASSIGN_OR_RAISE(auto buf, arrow::AllocateResizableBuffer(nbytes));
   Aws::S3::Model::GetObjectRequest req;
@@ -95,10 +97,9 @@ Result<ObjectRangeResult> GetObjectRange(
   req.SetKey(path.key);
   req.SetRange(FormatRange(start, end));
   req.SetResponseStreamFactory(AwsWriteableStreamFactory(buf->mutable_data(), nbytes));
-  auto start_time = util::time::now();
+  auto start_time = time::now();
   auto object_outcome = client->GetObject(req);
-  metrics_manager->NewDownload(util::get_duration_ms(start_time, util::time::now()),
-                               nbytes);
+  metrics_manager->NewDownload(util::get_duration_ms(start_time, time::now()), nbytes);
   if (!object_outcome.IsSuccess()) {
     return S3ErrorToStatus(object_outcome.GetError());
   }
@@ -130,8 +131,7 @@ Aws::Client::ClientConfiguration common_config(const SdkOptions& options) {
 }
 
 Downloader::Downloader(std::shared_ptr<Synchronizer> synchronizer, int pool_size,
-                       std::shared_ptr<util::MetricsManager> metrics,
-                       const SdkOptions& options)
+                       std::shared_ptr<MetricsManager> metrics, const SdkOptions& options)
     : queue_(synchronizer, pool_size),
       metrics_manager_(metrics),
       pool_size_(pool_size),
@@ -159,14 +159,14 @@ void Downloader::InitConnections(std::string bucket, int max_init_count) {
     const std::lock_guard<std::mutex> lock(init_interruption_mutex_);
     init_counter_ = 0;
   }
-  auto start = util::time::now();
+  auto start = time::now();
   for (int i = 0; i < max_init_count; i++) {
     queue_.PushRequest([this, bucket, max_init_count, start,
                         i]() -> Result<DownloadResponse> {
       {
         const std::lock_guard<std::mutex> lock(init_interruption_mutex_);
         if (init_counter_ >= max_init_count) {
-          auto time_since_init = util::get_duration_ms(start, util::time::now());
+          auto time_since_init = util::get_duration_ms(start, time::now());
           metrics_manager_->NewInitConnection("ABORTED", time_since_init, 0, 0);
           return STATUS_ABORTED;
         }
@@ -182,8 +182,8 @@ void Downloader::InitConnections(std::string bucket, int max_init_count) {
       req.SetKey(randomized_key);
       // we block before releasing the connection to allow up to
       // max_init_count initializations
-      util::time::time_point blocking_start_time;
-      util::time::time_point blocking_end_time;
+      time::time_point blocking_start_time;
+      time::time_point blocking_end_time;
       req.SetDataReceivedEventHandler([this, max_init_count, &blocking_start_time,
                                        &blocking_end_time](const Aws::Http::HttpRequest*,
                                                            const Aws::Http::HttpResponse*,
@@ -192,7 +192,7 @@ void Downloader::InitConnections(std::string bucket, int max_init_count) {
           // the callback was already called for this init
           return;
         }
-        blocking_start_time = util::time::now();
+        blocking_start_time = time::now();
         std::unique_lock<std::mutex> lock(init_interruption_mutex_);
         init_counter_++;
         if (init_counter_ < max_init_count) {
@@ -202,7 +202,7 @@ void Downloader::InitConnections(std::string bucket, int max_init_count) {
           lock.unlock();
           init_interruption_cv_.notify_all();
         }
-        blocking_end_time = util::time::now();
+        blocking_end_time = time::now();
       });
       auto outcome = init_client_->DeleteObject(req);
       std::string result;
@@ -214,7 +214,7 @@ void Downloader::InitConnections(std::string bucket, int max_init_count) {
       if (!blocking_start_time.time_since_epoch().count() &&
           !blocking_end_time.time_since_epoch().count()) {
         // sync_callback never called, likely because of timeout
-        blocking_start_time = blocking_end_time = util::time::now();
+        blocking_start_time = blocking_end_time = time::now();
         std::unique_lock<std::mutex> lock(init_interruption_mutex_);
         init_counter_++;
         if (init_counter_ == max_init_count) {
@@ -224,7 +224,7 @@ void Downloader::InitConnections(std::string bucket, int max_init_count) {
       }
       // if resolution_time_ms << 0 it means that the callback was never called
       metrics_manager_->NewInitConnection(
-          std::move(result), util::get_duration_ms(start, util::time::now()),
+          std::move(result), util::get_duration_ms(start, time::now()),
           util::get_duration_ms(start, blocking_start_time),
           util::get_duration_ms(blocking_start_time, blocking_end_time));
 
@@ -254,3 +254,5 @@ void Downloader::ScheduleDownload(DownloadRequest request) {
 std::vector<Result<DownloadResponse>> Downloader::ProcessResponses() {
   return queue_.PopResponses();
 }
+
+}  // namespace Buzz

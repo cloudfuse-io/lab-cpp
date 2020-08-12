@@ -30,14 +30,10 @@
 #include <mutex>
 #include <queue>
 
-#include "arrow/memory_pool.h"
-#include "arrow/result.h"
-#include "arrow/status.h"
-
 static constexpr int64_t PREALLOC_SIZE_BYTES = 1024 * 1024;
 static constexpr int64_t PREALLOC_COUNT = 1500;
 
-namespace arrow {
+namespace Buzz {
 
 // compute the "whole page size" equivalent of this size
 size_t whole_page_size(size_t raw_size) {

@@ -31,6 +31,8 @@
 #include "parquet-helpers.h"
 #include "partial-file.h"
 
+namespace Buzz {
+
 enum class AggType { SUM };
 
 enum class TimeBucket { HOUR };
@@ -141,7 +143,7 @@ class Dispatcher {
   Dispatcher(arrow::MemoryPool* mem_pool, const SdkOptions& options,
              int max_concurrent_dl, int nb_con_init) {
     synchronizer_ = std::make_shared<Synchronizer>();
-    metrics_manager_ = std::make_shared<util::MetricsManager>();
+    metrics_manager_ = std::make_shared<MetricsManager>();
 
     downloader_ = std::make_shared<Downloader>(synchronizer_, max_concurrent_dl,
                                                metrics_manager_, options);
@@ -152,8 +154,8 @@ class Dispatcher {
   Status execute(const Query& query) {
     // download the footer of the file queried
     metrics_manager_->EnterPhase("wait_foot");
-    auto file_metadata = Buzz::GetMetadata(downloader_, synchronizer_, mem_pool_,
-                                           query.file, nb_con_init_);
+    auto file_metadata =
+        GetMetadata(downloader_, synchronizer_, mem_pool_, query.file, nb_con_init_);
     metrics_manager_->ExitPhase("wait_foot");
 
     // TODO plans for filters and group_bys
@@ -168,7 +170,7 @@ class Dispatcher {
 
     // Filter row groups with metadata here (ParquetFileFragment::FilterRowGroups())
     // For strings only min/max can be used (dict not available in footer)
-    Buzz::ColumnCache column_cache;
+    ColumnCache column_cache;
     for (int i = 0; i < file_metadata->num_row_groups(); i++) {
       for (auto col_plan : col_phys_plans) {
         // TODO analyse metadata
@@ -191,8 +193,8 @@ class Dispatcher {
         // TODO make sure the column is in the cache for the same query
         if (!column_cache.GetColumn(query.file.ToString(), i, col_plan->col_id)
                  .has_value()) {
-          Buzz::DownloadColumnChunck(downloader_, file_metadata, query.file, i,
-                                     col_plan->col_id);
+          DownloadColumnChunck(downloader_, file_metadata, query.file, i,
+                               col_plan->col_id);
           chuncks_to_dl++;
         }
       }
@@ -205,7 +207,7 @@ class Dispatcher {
       synchronizer_->wait();
       metrics_manager_->ExitPhase("wait_dl");
 
-      auto col_chunck_files = Buzz::GetColumnChunckFiles(downloader_);
+      auto col_chunck_files = GetColumnChunckFiles(downloader_);
       downloaded_chuncks += col_chunck_files.size();
       for (auto& col_chunck_file : col_chunck_files) {
         metrics_manager_->EnterPhase("col_proc");
@@ -307,7 +309,9 @@ class Dispatcher {
 
   arrow::MemoryPool* mem_pool_;
   std::shared_ptr<Synchronizer> synchronizer_;
-  std::shared_ptr<util::MetricsManager> metrics_manager_;
+  std::shared_ptr<MetricsManager> metrics_manager_;
   std::shared_ptr<Downloader> downloader_;
   int nb_con_init_;
 };
+
+}  // namespace Buzz

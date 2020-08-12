@@ -19,6 +19,8 @@
 
 #include <iostream>
 
+namespace Buzz {
+
 enum class AwsSdkLogLevel : int8_t { Off, Fatal, Error, Warn, Info, Debug, Trace };
 
 void InitializeAwsSdk(const AwsSdkLogLevel& options);
@@ -36,3 +38,5 @@ struct SdkOptions {
   /// S3 connection transport, default "https"
   std::string scheme = "https";
 };
+
+}  // namespace Buzz

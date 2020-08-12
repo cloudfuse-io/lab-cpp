@@ -19,8 +19,7 @@
 
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
-
-#include "toolbox.h"
+#include <toolbox.h>
 
 namespace Buzz {
 
@@ -31,14 +30,14 @@ class LogEntry {
   void IntField(const char* key, int64_t value);
   void FloatField(const char* key, double value);
   void Log();
-  LogEntry(const char* msg, util::time::time_point timestamp);
+  LogEntry(const char* msg, time::time_point timestamp);
 
  private:
   rapidjson::StringBuffer buffer_;
   rapidjson::Writer<rapidjson::StringBuffer> writer_;
 };
 
-LogEntry NewEntry(const char* msg, util::time::time_point timestamp = util::time::now());
+LogEntry NewEntry(const char* msg, time::time_point timestamp = time::now());
 
 void IncrementRunCounter();
 

@@ -15,7 +15,6 @@ list(APPEND BUZZ_ALL buzz-aws)
 
 if("${BUZZ_BUILD_TESTS}" STREQUAL "ON")
   package_add_test(NAME downloader_test SRCS downloader_test.cc DEPS buzz-aws buzz-util)
-  package_add_test(NAME partial-file_test SRCS partial-file_test.cc DEPS buzz-aws buzz-util)
 endif()
 
 

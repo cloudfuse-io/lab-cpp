@@ -3,10 +3,11 @@ add_library (buzz-bee STATIC
   stats.cc)
 target_include_directories(buzz-bee PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_arrow(buzz-bee)
+target_link_libraries(buzz-bee PRIVATE buzz-util)
 list(APPEND BUZZ_ALL buzz-bee)
 
 if("${BUZZ_BUILD_TESTS}" STREQUAL "ON")
-  # package_add_test(NAME XXX_test SRCS XXX_test.cc DEPS buzz-util)
+  package_add_test(NAME stats_test SRCS stats_test.cc DEPS buzz-util)
 endif()
 
 

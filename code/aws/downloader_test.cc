@@ -22,6 +22,8 @@
 
 #include <cstdint>
 
+namespace Buzz {
+
 TEST(Helpers, FormatRange) {
   ASSERT_EQ(FormatRange(0, 10), "bytes=0-10");
   ASSERT_EQ(FormatRange(std::nullopt, 10), "bytes=-10");
@@ -36,3 +38,5 @@ TEST(Helpers, CalculateLength) {
   ASSERT_EQ(CalculateLength(0, 10), 11);
   ASSERT_EQ(CalculateLength(std::nullopt, 10), 10);
 }
+
+}  // namespace Buzz

@@ -23,7 +23,7 @@
 
 #include <cstdint>
 
-namespace util {
+namespace Buzz {
 
 TEST(HashingTraits, Compare) {
   HashingTraits<parquet::ByteArray>::Equal byte_array_comparator;
@@ -39,4 +39,4 @@ TEST(HashingTraits, Compare) {
   ASSERT_FALSE(byte_array_comparator(lhs_ba, rhs_ba_ne));
 }
 
-}  // namespace util
+}  // namespace Buzz

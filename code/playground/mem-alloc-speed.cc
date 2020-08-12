@@ -14,6 +14,8 @@
 #include "bootstrap.h"
 #include "toolbox.h"
 
+using namespace Buzz;
+
 constexpr int64_t PAGE_SIZE = 4 * 1024;
 constexpr int64_t NB_REPETITION = 2;
 
@@ -39,11 +41,11 @@ static aws::lambda_runtime::invocation_response my_handler(
     for (int j = 0; j < NB_ALLOCATION; j++) {
       uint32_t new_pages_allocated{0};
       std::shared_ptr<arrow::Buffer> buf;
-      auto start_time = std::chrono::high_resolution_clock::now();
+      auto start_time = time::now();
       PARQUET_ASSIGN_OR_THROW(
           buf, arrow::AllocateBuffer(ALLOCATION_SIZE_BYTE, arrow::default_memory_pool()));
       memset(buf->mutable_data(), i, static_cast<size_t>(buf->size()));
-      auto end_time = std::chrono::high_resolution_clock::now();
+      auto end_time = time::now();
       auto current_ptr_page = buf->mutable_address() / PAGE_SIZE;
       for (int i = 0; i < ALLOCATION_SIZE_BYTE / PAGE_SIZE; i++) {
         if (allocated_pages.insert(current_ptr_page + i).second) {

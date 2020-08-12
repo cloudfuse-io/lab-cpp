@@ -13,6 +13,8 @@
 #include "bootstrap.h"
 #include "toolbox.h"
 
+using namespace Buzz;
+
 static int64_t NB_PAGE = util::getenv_int("NB_PAGE", 1024);
 static std::string ALLOC_TEST_NAME = util::getenv("ALLOC_TEST_NAME", "mmap_hugepage");
 

@@ -10,8 +10,8 @@ list(APPEND BUZZ_ALL buzz-util)
 
 if("${BUZZ_BUILD_TESTS}" STREQUAL "ON")
   package_add_test(NAME cust_memory_pool_test SRCS cust_memory_pool_test.cc DEPS buzz-util)
-  package_add_test(NAME stats_test SRCS stats_test.cc DEPS buzz-util)
   package_add_test(NAME async_queue_test SRCS async_queue_test.cc DEPS buzz-util)
+  package_add_test(NAME partial-file_test SRCS partial-file_test.cc DEPS buzz-aws buzz-util)
 endif()
 
 

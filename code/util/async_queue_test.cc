@@ -19,6 +19,8 @@
 #include <gmock/gmock-matchers.h>
 #include <gtest/gtest.h>
 
+namespace Buzz {
+
 using namespace testing;
 
 TEST(AsyncQueue, IntMonoThread) {
@@ -58,3 +60,5 @@ TEST(AsyncQueue, SharedPointer) {
   ASSERT_EQ(responses[0].status(), Status::OK());
   ASSERT_EQ(*(responses[0].ValueOrDie()), 2);
 }
+
+}  // namespace Buzz

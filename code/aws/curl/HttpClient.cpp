@@ -326,7 +326,7 @@ std::shared_ptr<Aws::Http::HttpResponse> CurlHttpClient::MakeRequest(
     const std::shared_ptr<Aws::Http::HttpRequest>& request,
     Aws::Utils::RateLimits::RateLimiterInterface* readLimiter,
     Aws::Utils::RateLimits::RateLimiterInterface* writeLimiter) const {
-  auto start = util::time::now();
+  auto start = time::now();
   Aws::Http::URI uri = request->GetUri();
   Aws::String url = uri.GetURIString();
   std::shared_ptr<Aws::Http::HttpResponse> response =
@@ -530,7 +530,7 @@ std::shared_ptr<Aws::Http::HttpResponse> CurlHttpClient::MakeRequest(
                           "Releasing curl handle " << connectionHandle);
     }
 
-    auto entry = Buzz::logger::NewEntry("client_stats");
+    auto entry = logger::NewEntry("client_stats");
     entry.IntField("curl_code", curlResponseCode);
 
     double dns_time = 0;
@@ -584,7 +584,7 @@ std::shared_ptr<Aws::Http::HttpResponse> CurlHttpClient::MakeRequest(
             Aws::Monitoring::HttpClientMetricsType::RequestLatency),
         (Aws::Utils::DateTime::Now() - startTransmissionTime).count());
 
-    entry.IntField("total_ms", util::get_duration_ms(start, util::time::now()));
+    entry.IntField("total_ms", util::get_duration_ms(start, time::now()));
     entry.Log();
   }
 

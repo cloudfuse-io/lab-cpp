@@ -21,8 +21,6 @@
 #include <iostream>
 #include <map>
 
-#include "toolbox.h"
-
 namespace Buzz {
 
 namespace logger {
@@ -30,13 +28,13 @@ using namespace rapidjson;
 
 static int64_t CONTAINER_RUNS = 0;
 
-LogEntry NewEntry(const char* msg, util::time::time_point timestamp) {
+LogEntry NewEntry(const char* msg, time::time_point timestamp) {
   return LogEntry(msg, timestamp);
 }
 
 void IncrementRunCounter() { CONTAINER_RUNS++; }
 
-LogEntry::LogEntry(const char* msg, util::time::time_point timestamp)
+LogEntry::LogEntry(const char* msg, time::time_point timestamp)
     : buffer_(), writer_(buffer_) {
   writer_.StartObject();
   writer_.Key("ts");

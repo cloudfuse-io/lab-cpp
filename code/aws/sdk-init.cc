@@ -25,6 +25,8 @@
 
 #include "curl/HttpClientFactory.h"
 
+namespace Buzz {
+
 namespace {
 
 std::mutex aws_init_lock;
@@ -59,7 +61,7 @@ void InitializeAwsSdk(const AwsSdkLogLevel& log_level) {
           aws_options.loggingOptions.logLevel);
     };
     aws_options.httpOptions.httpClientFactory_create_fn = []() {
-      return std::make_shared<Buzz::Http::CustomHttpClientFactory>();
+      return std::make_shared<Http::CustomHttpClientFactory>();
     };
     // httpOptions: is setting custom httpClientFactory_create_fn, then initAndCleanupCurl
     // and installSigPipeHandler should by handled by the custom HttpClientFacory
@@ -73,3 +75,5 @@ void FinalizeAwsSdk() {
   Aws::ShutdownAPI(aws_options);
   aws_initialized = false;
 }
+
+}  // namespace Buzz

@@ -8,6 +8,8 @@
 #include "bootstrap.h"
 #include "logger.h"
 
+using namespace Buzz;
+
 void __cpuid(int* cpuinfo, int info) {
   __asm__ __volatile__(
       "xchg %%ebx, %%edi;"
@@ -75,7 +77,7 @@ void print_simd_support() {
   }
 
   // ----------------------------------------------------------------------
-  auto entry = Buzz::logger::NewEntry("supp_simd_instr_sets");
+  auto entry = logger::NewEntry("supp_simd_instr_sets");
   entry.IntField("SSE", sseSupportted);
   entry.IntField("SSE2", sse2Supportted);
   entry.IntField("SSE3", sse3Supportted);
@@ -91,7 +93,7 @@ static aws::lambda_runtime::invocation_response my_handler(
     aws::lambda_runtime::invocation_request const& req) {
   print_simd_support();
 
-  auto entry = Buzz::logger::NewEntry("cpu_hardware");
+  auto entry = logger::NewEntry("cpu_hardware");
   entry.IntField("nb_cores",
                  std::thread::hardware_concurrency());  // seems to be always 2
   entry.IntField("current_core", sched_getcpu());       // should be 0 or 1

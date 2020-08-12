@@ -27,6 +27,9 @@
 
 #include "async_queue.h"
 #include "metrics.h"
+#include "sdk-init.h"
+
+namespace Buzz {
 
 #if !defined(BUZZ_STATUS_ABORT)
 #define BUZZ_STATUS_ABORT 1
@@ -60,7 +63,7 @@ class Downloader {
   /// The Synchronizer allows the downloader to notify the dispatcher when a new
   /// download is ready
   Downloader(std::shared_ptr<Synchronizer> synchronizer, int pool_size,
-             std::shared_ptr<util::MetricsManager> metrics, const SdkOptions& options);
+             std::shared_ptr<MetricsManager> metrics, const SdkOptions& options);
 
   /// max_init_count should be <= than pool_size
   /// TODO: if called again before previous init complete, behaviour is undefined
@@ -78,8 +81,10 @@ class Downloader {
   AsyncQueue<DownloadResponse> queue_;
   std::shared_ptr<Aws::S3::S3Client> dl_client_;
   std::shared_ptr<Aws::S3::S3Client> init_client_;
-  std::shared_ptr<util::MetricsManager> metrics_manager_;
+  std::shared_ptr<MetricsManager> metrics_manager_;
   int init_counter_;
   std::condition_variable init_interruption_cv_;
   std::mutex init_interruption_mutex_;
 };
+
+}  // namespace Buzz

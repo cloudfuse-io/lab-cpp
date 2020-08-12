@@ -15,6 +15,8 @@
 #include "bootstrap.h"
 #include "toolbox.h"
 
+using namespace Buzz;
+
 extern char* je_arrow_malloc_conf;
 constexpr int64_t PAGE_SIZE = 4 * 1024;
 int64_t NB_REPETITION = util::getenv_int("NB_REPETITION", 100);

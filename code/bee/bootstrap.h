@@ -24,11 +24,13 @@
 #include "logger.h"
 #include "toolbox.h"
 
+namespace Buzz {
+
 template <typename Func>
 void bootstrap(Func handler) {
   auto wrapped_handler =
       [handler](const aws::lambda_runtime::invocation_request& request) {
-        Buzz::logger::IncrementRunCounter();
+        logger::IncrementRunCounter();
         return handler(request);
       };
   if (util::getenv_bool("IS_LOCAL", false)) {
@@ -39,3 +41,5 @@ void bootstrap(Func handler) {
     aws::lambda_runtime::run_handler(wrapped_handler);
   }
 }
+
+}  // namespace Buzz

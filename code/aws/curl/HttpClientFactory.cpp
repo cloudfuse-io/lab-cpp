@@ -33,8 +33,8 @@ static void LogAndSwallowHandler(int signal) {
 /// (in order to better re-use ssl connections) and not by client
 std::shared_ptr<Aws::Http::HttpClient> CustomHttpClientFactory::CreateHttpClient(
     const Aws::Client::ClientConfiguration& clientConfiguration) const {
-  return Aws::MakeShared<Buzz::Http::CurlHttpClient>(HTTP_CLIENT_FACTORY_ALLOCATION_TAG,
-                                                     clientConfiguration);
+  return Aws::MakeShared<Http::CurlHttpClient>(HTTP_CLIENT_FACTORY_ALLOCATION_TAG,
+                                               clientConfiguration);
 }
 
 std::shared_ptr<Aws::Http::HttpRequest> CustomHttpClientFactory::CreateHttpRequest(
@@ -55,7 +55,7 @@ std::shared_ptr<Aws::Http::HttpRequest> CustomHttpClientFactory::CreateHttpReque
 
 void CustomHttpClientFactory::InitStaticState() {
   if (s_InitCleanupCurlFlag) {
-    Buzz::Http::CurlHttpClient::InitGlobalState();
+    Http::CurlHttpClient::InitGlobalState();
   }
   if (s_InstallSigPipeHandler) {
     ::signal(SIGPIPE, LogAndSwallowHandler);
@@ -64,7 +64,7 @@ void CustomHttpClientFactory::InitStaticState() {
 
 void CustomHttpClientFactory::CleanupStaticState() {
   if (s_InitCleanupCurlFlag) {
-    Buzz::Http::CurlHttpClient::CleanupGlobalState();
+    Http::CurlHttpClient::CleanupGlobalState();
   }
 }
 

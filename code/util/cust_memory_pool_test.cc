@@ -17,14 +17,12 @@
 
 #include "cust_memory_pool.h"
 
-#include <arrow/memory_pool.h>
-#include <arrow/status.h>
 #include <arrow/testing/gtest_util.h>
 #include <gtest/gtest.h>
 
 #include <cstdint>
 
-namespace arrow {
+namespace Buzz {
 
 #ifdef ACTIVATE_RUNWAY_ALLOCATOR
 TEST(CustomMemoryPool, Custom) {
@@ -82,4 +80,4 @@ TEST(CustomMemoryPool, Custom) {
 }
 #endif
 
-}  // namespace arrow
+}  // namespace Buzz

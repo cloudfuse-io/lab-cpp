@@ -72,10 +72,9 @@ std::shared_ptr<parquet::FileMetaData> GetMetadata(
     }
   }
   auto footer_start_pos = footer_response.file_size - footer_response.request.range_end;
-  std::vector<Buzz::FileChunck> footer_chuncks{
-      {footer_start_pos, footer_response.raw_data}};
+  std::vector<FileChunck> footer_chuncks{{footer_start_pos, footer_response.raw_data}};
   auto footer_file =
-      std::make_shared<Buzz::PartialFile>(footer_chuncks, footer_response.file_size);
+      std::make_shared<PartialFile>(footer_chuncks, footer_response.file_size);
 
   // setup raw reader for footers
   parquet::ReaderProperties props(mem_pool);
@@ -103,7 +102,7 @@ void DownloadColumnChunck(std::shared_ptr<Downloader> downloader,
 struct ColChunckFile {
   int row_group;
   int column;
-  std::shared_ptr<Buzz::PartialFile> file;
+  std::shared_ptr<PartialFile> file;
 };
 
 std::vector<ColChunckFile> GetColumnChunckFiles(std::shared_ptr<Downloader> downloader) {
@@ -118,12 +117,11 @@ std::vector<ColChunckFile> GetColumnChunckFiles(std::shared_ptr<Downloader> down
         response.request.range_end == 0) {
       continue;
     }
-    std::vector<Buzz::FileChunck> rg_chuncks{
+    std::vector<FileChunck> rg_chuncks{
         {response.request.range_start.value(), response.raw_data}};
     auto chunck_ids = rg_start_map[response.request];
-    rg_files.push_back(
-        {chunck_ids.row_group, chunck_ids.column,
-         std::make_shared<Buzz::PartialFile>(rg_chuncks, response.file_size)});
+    rg_files.push_back({chunck_ids.row_group, chunck_ids.column,
+                        std::make_shared<PartialFile>(rg_chuncks, response.file_size)});
   }
   return rg_files;
 }

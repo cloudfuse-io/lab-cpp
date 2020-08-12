@@ -17,6 +17,8 @@
 
 #include "async_queue.h"
 
+namespace Buzz {
+
 void Synchronizer::notify() {
   {
     std::unique_lock<std::mutex> lock(this->mutex_);
@@ -34,3 +36,5 @@ void Synchronizer::consume(int work_units) {
   std::unique_lock<std::mutex> lock(this->mutex_);
   this->work_ -= work_units;
 }
+
+}  // namespace Buzz

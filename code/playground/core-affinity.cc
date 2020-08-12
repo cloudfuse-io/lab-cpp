@@ -23,6 +23,8 @@
 #include "bootstrap.h"
 #include "logger.h"
 
+using namespace Buzz;
+
 constexpr int ARRAY_SIZE = 8 * 1024 * 1024;
 constexpr double GIGA = 1024. * 1024. * 1024.;
 constexpr double ARRAY_BYTES = ARRAY_SIZE * sizeof(int64_t);
@@ -34,29 +36,29 @@ static aws::lambda_runtime::invocation_response my_handler(
   std::vector<int64_t*> arrays;
   for (int run = 0; run < 5; run++) {
     // alloc array
-    auto alloc_start_time = std::chrono::high_resolution_clock::now();
+    auto alloc_start_time = time::now();
     int64_t* values;
     posix_memalign(reinterpret_cast<void**>(&values), 64,
                    static_cast<size_t>(ARRAY_BYTES));
     for (int i = 0; i < ARRAY_SIZE; i++) {
       values[i] = i;
     }
-    auto alloc_end_time = std::chrono::high_resolution_clock::now();
+    auto alloc_end_time = time::now();
     auto alloc_duration = util::get_duration_micro(alloc_start_time, alloc_end_time);
     arrays.push_back(values);
     std::vector<std::thread> threads(2);
     for (unsigned thread_nb = 0; thread_nb < 2; ++thread_nb) {
       // setup thread
       threads[thread_nb] = std::thread([values, thread_nb] {
-        auto agg_start_time = std::chrono::high_resolution_clock::now();
+        auto agg_start_time = time::now();
         int64_t sum = 0;
         for (int i = 0; i < ARRAY_SIZE; i++) {
           sum += std::sin(values[i]);
         }
-        auto agg_end_time = std::chrono::high_resolution_clock::now();
+        auto agg_end_time = time::now();
         auto agg_duration = util::get_duration_micro(agg_start_time, agg_end_time);
 
-        auto entry = Buzz::logger::NewEntry("mem_bandwidth");
+        auto entry = logger::NewEntry("mem_bandwidth");
         entry.FloatField("agg_GBpS", ARRAY_BYTES / agg_duration * 1000. * 1000. / GIGA);
         entry.IntField("agg_ms", agg_duration / 1000);
         entry.IntField("computed_sum", sum);

@@ -23,7 +23,7 @@
 #include <thread>
 #include <vector>
 
-namespace util {
+namespace Buzz {
 
 class MetricsManager {
  public:
@@ -58,4 +58,4 @@ class MetricsManager {
   class Impl;
   std::unique_ptr<Impl> impl_;
 };
-}  // namespace util
+}  // namespace Buzz

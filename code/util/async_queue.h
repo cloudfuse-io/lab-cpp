@@ -25,6 +25,8 @@
 
 #include "result.h"
 
+namespace Buzz {
+
 /// Synchronize the results of multiple AsyncQueues together
 class Synchronizer {
  public:
@@ -133,3 +135,5 @@ AsyncQueue<ResponseType>::~AsyncQueue() {
   request_cv_.notify_all();
   for (std::thread& worker : workers_) worker.join();
 }
+
+}  // namespace Buzz

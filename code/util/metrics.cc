@@ -24,7 +24,7 @@
 #include "logger.h"
 #include "toolbox.h"
 
-namespace util {
+namespace Buzz {
 
 namespace {
 
@@ -107,7 +107,7 @@ class MetricsManager::Impl {
                 [](MetricEvent const& a, MetricEvent const& b) -> bool {
                   return a.timestamp < b.timestamp;
                 });
-      auto first_time = ::util::get_duration_ms(ref_time_, metric_events[0].timestamp);
+      auto first_time = util::get_duration_ms(ref_time_, metric_events[0].timestamp);
       sorted_threads.insert({first_time, metric_events});
     }
 
@@ -116,7 +116,7 @@ class MetricsManager::Impl {
       auto previous_time = ref_time_;
       for (const auto& event : thread.second) {
         std::cout << ",";
-        std::cout << ::util::get_duration_ms(previous_time, event.timestamp);
+        std::cout << util::get_duration_ms(previous_time, event.timestamp);
         previous_time = event.timestamp;
       }
       std::cout << std::endl;
@@ -134,7 +134,7 @@ class MetricsManager::Impl {
 
   void PrintDownloads() const {
     for (const auto& event : downloads_.clone()) {
-      auto entry = Buzz::logger::NewEntry("downloads", event.timestamp);
+      auto entry = logger::NewEntry("downloads", event.timestamp);
       entry.IntField("duration_ms", event.duration_ms);
       entry.IntField("size_B", event.size);
       entry.FloatField("speed_MBpS",
@@ -159,7 +159,7 @@ class MetricsManager::Impl {
       }
       std::cout << std::endl;
     }
-    auto entry = Buzz::logger::NewEntry("phase_durations");
+    auto entry = logger::NewEntry("phase_durations");
     for (auto& duration : total_durations) {
       entry.IntField(duration.first.data(), duration.second);
     }
@@ -178,7 +178,7 @@ class MetricsManager::Impl {
 
   void PrintInitConnections() const {
     for (const auto& event : init_connections_.clone()) {
-      auto entry = Buzz::logger::NewEntry("init_connection", event.timestamp);
+      auto entry = logger::NewEntry("init_connection", event.timestamp);
       entry.StrField("result", event.result.data());
       entry.IntField("total_duration_ms", event.total_duration_ms);
       entry.IntField("blocking_time_ms", event.blocking_time_ms);
@@ -259,4 +259,4 @@ void MetricsManager::ExitPhase(std::string name) { impl_->ExitPhase(name); }
 
 void MetricsManager::Reset() { impl_->Reset(); }
 
-}  // namespace util
+}  // namespace Buzz

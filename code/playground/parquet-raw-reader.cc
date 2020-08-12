@@ -109,7 +109,7 @@ static aws::lambda_runtime::invocation_response my_handler(
     metrics_manager->EnterPhase("wait_dl");
     synchronizer->wait();
     metrics_manager->ExitPhase("wait_dl");
-    auto col_chunck_files = GetColumnChunckFiles(downloader);
+    auto col_chunck_files = GetChunckFiles(downloader);
     for (auto& col_chunck_file : col_chunck_files) {
       metrics_manager->EnterPhase("proc");
       metrics_manager->NewEvent("starting_proc");

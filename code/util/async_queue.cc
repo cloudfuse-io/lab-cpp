@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "dispatcher.h"
+#include "async_queue.h"
 
 void Synchronizer::notify() {
   {

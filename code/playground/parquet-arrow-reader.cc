@@ -15,12 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include <arrow/api.h>
-#include <arrow/compute/api.h>
-#include <arrow/io/api.h>
 #include <aws/lambda-runtime/runtime.h>
-#include <parquet/arrow/reader.h>
-#include <parquet/exception.h>
 
 #include <iostream>
 

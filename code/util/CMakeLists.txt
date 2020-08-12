@@ -1,6 +1,6 @@
 add_library (buzz-util STATIC
   cust_memory_pool.cc
-  dispatcher.cc
+  async_queue.cc
   metrics.cc
   logger.cc
   stats.cc)

@@ -52,9 +52,15 @@ struct RequestEqual {
   }
 };
 
+struct ParquetColumnChunckIds {
+  int row_group;
+  int column;
+};
+
 }  // namespace
 
-std::unordered_map<DownloadRequest, int, RequestWeakHash, RequestEqual> rg_start_map;
+std::unordered_map<DownloadRequest, ParquetColumnChunckIds, RequestWeakHash, RequestEqual>
+    rg_start_map;
 
 std::shared_ptr<parquet::FileMetaData> GetMetadata(
     std::shared_ptr<Downloader> downloader, std::shared_ptr<Synchronizer> synchronizer,
@@ -101,11 +107,12 @@ void DownloadColumnChunck(std::shared_ptr<Downloader> downloader,
   auto col_chunck_end = col_chunck_start + col_chunck_meta->total_compressed_size();
   downloader->ScheduleDownload({col_chunck_start, col_chunck_end, path});
   rg_start_map.emplace(DownloadRequest{col_chunck_start, col_chunck_end, path},
-                       row_group);
+                       ParquetColumnChunckIds{row_group, column});
 }
 
 struct ColChunckFile {
   int row_group;
+  int column;
   std::shared_ptr<Buzz::PartialFile> file;
 };
 
@@ -123,8 +130,9 @@ std::vector<ColChunckFile> GetColumnChunckFiles(std::shared_ptr<Downloader> down
     }
     std::vector<Buzz::FileChunck> rg_chuncks{
         {response.request.range_start.value(), response.raw_data}};
+    auto chunck_ids = rg_start_map[response.request];
     rg_files.push_back(
-        {rg_start_map[response.request],
+        {chunck_ids.row_group, chunck_ids.column,
          std::make_shared<Buzz::PartialFile>(rg_chuncks, response.file_size)});
   }
   return rg_files;

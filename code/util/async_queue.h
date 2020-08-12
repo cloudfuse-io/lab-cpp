@@ -23,8 +23,21 @@
 #include <queue>
 #include <thread>
 
-#include "dispatcher.h"
 #include "result.h"
+
+/// Synchronize the results of multiple AsyncQueues together
+class Synchronizer {
+ public:
+  void notify();
+  void wait();
+  void consume(int work_units);
+
+ private:
+  std::condition_variable cv_;
+  std::mutex mutex_;
+  // TODO count work by notifiers
+  int work_;
+};
 
 template <typename ResponseType>
 class AsyncQueue {
@@ -54,6 +67,8 @@ class AsyncQueue {
   std::vector<std::thread> workers_;
   bool stop_;
 };
+
+//// AsyncQueue HEADER ONLY BECAUSE OF TEMPLATING ////
 
 template <typename ResponseType>
 AsyncQueue<ResponseType>::AsyncQueue(std::shared_ptr<Synchronizer> synchronizer,

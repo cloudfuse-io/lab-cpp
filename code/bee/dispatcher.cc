@@ -14,21 +14,3 @@
 // KIND, either express or implied. See the License for the
 // specific language governing permissions and limitations
 // under the License.
-
-#pragma once
-
-#include <condition_variable>
-#include <mutex>
-
-class Synchronizer {
- public:
-  void notify();
-  void wait();
-  void consume(int work_units);
-
- private:
-  std::condition_variable cv_;
-  std::mutex mutex_;
-  // TODO count work by notifiers
-  int work_;
-};

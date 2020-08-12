@@ -37,6 +37,8 @@ const Status STATUS_ABORTED(StatusCode::UnknownError, "query_aborted");
 struct S3Path {
   std::string bucket;
   std::string key;
+
+  std::string ToString() const { return bucket + "/" + key; }
 };
 
 /// if range_start==range_end==0 this is an init request

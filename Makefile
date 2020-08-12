@@ -144,6 +144,11 @@ run-local-parquet-raw-reader:
 	BUILD_FILE=parquet-raw-reader \
 	make run-bee-local
 
+run-local-parquet-bee:
+	COMPOSE_TYPE=minio \
+	BUILD_FILE=parquet-bee \
+	make run-bee-local
+
 run-local-mem-alloc-overprov:
 	COMPOSE_TYPE=standalone \
 	BUILD_FILE=mem-alloc-overprov \

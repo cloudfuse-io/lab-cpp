@@ -37,14 +37,13 @@ namespace Buzz {
 class Dispatcher {
  public:
   Dispatcher(arrow::MemoryPool* mem_pool, const SdkOptions& options,
-             int max_concurrent_dl, int nb_con_init) {
+             int max_concurrent_dl)
+      : processor_(mem_pool) {
     synchronizer_ = std::make_shared<Synchronizer>();
     metrics_manager_ = std::make_shared<MetricsManager>();
 
     downloader_ = std::make_shared<Downloader>(synchronizer_, max_concurrent_dl,
                                                metrics_manager_, options);
-    mem_pool_ = mem_pool;
-    nb_con_init_ = nb_con_init;
   }
 
   Status execute(std::vector<S3Path> files, const Query& query) {
@@ -70,7 +69,7 @@ class Dispatcher {
         if (chunck_file.row_group == -1) {
           //// PROCESS FOOTER DOWNLOAD ////
           footers_downloaded++;
-          auto file_metadata = ReadMetadata(mem_pool_, chunck_file.file);
+          auto file_metadata = processor_.ReadMetadata(chunck_file.file);
 
           auto col_phys_plans = ColumnPhysicalPlans::Make(query, file_metadata);
 
@@ -81,10 +80,11 @@ class Dispatcher {
           // For strings only min/max can be used (dict not available in footer)
           for (int i = 0; i < file_metadata->num_row_groups(); i++) {
             for (auto col_plan : col_phys_plans) {
-              auto metadata_preproc = PreprocessColumnMetadata(col_plan, file_metadata);
-              if (metadata_preproc.ok()) {
+              auto metadata_preproc =
+                  processor_.PreprocessColumnMetadata(col_plan, file_metadata, i);
+              if (metadata_preproc.has_value()) {
                 preproc_cache.AddColumn(chunck_file.path.ToString(), i, col_plan->col_id,
-                                        metadata_preproc.ValueOrDie());
+                                        metadata_preproc.value());
                 // TODO process RowGroup if complete
               }
             }
@@ -107,18 +107,14 @@ class Dispatcher {
         } else {
           //// PROCESS COL CHUNCK DOWNLOAD ////
           col_chuncks_downloaded++;
-          auto file_metadata =
+          auto [file_metadata, col_phys_plans] =
               preproc_cache.GetMetadata(chunck_file.path.ToString()).ValueOrDie();
-
-          auto col_phys_plans =
-              preproc_cache.GetPhysicalPlans(chunck_file.path.ToString()).ValueOrDie();
 
           // pre-process columns
           metrics_manager_->EnterPhase("col_proc");
           metrics_manager_->NewEvent("starting_col_proc");
-          ARROW_ASSIGN_OR_RAISE(
-              auto col_proc_result,
-              PreprocessColumnFile(mem_pool_, file_metadata, chunck_file));
+          ARROW_ASSIGN_OR_RAISE(auto col_proc_result, processor_.PreprocessColumnFile(
+                                                          file_metadata, chunck_file));
           metrics_manager_->ExitPhase("col_proc");
 
           // cache pre-process results
@@ -133,9 +129,9 @@ class Dispatcher {
             ARROW_ASSIGN_OR_RAISE(auto preproc_cols,
                                   preproc_cache.GetRowGroup(chunck_file.path.ToString(),
                                                             chunck_file.row_group));
-            RETURN_NOT_OK(ProcessRowGroup(mem_pool_,
-                                          file_metadata->RowGroup(chunck_file.row_group),
-                                          col_phys_plans, query, preproc_cols));
+            RETURN_NOT_OK(
+                processor_.ProcessRowGroup(file_metadata->RowGroup(chunck_file.row_group),
+                                           col_phys_plans, query, preproc_cols));
             metrics_manager_->ExitPhase("rg_proc");
           }
         }
@@ -149,11 +145,10 @@ class Dispatcher {
   }
 
  private:
-  arrow::MemoryPool* mem_pool_;
+  Processor processor_;
   std::shared_ptr<Synchronizer> synchronizer_;
   std::shared_ptr<MetricsManager> metrics_manager_;
   std::shared_ptr<Downloader> downloader_;
-  int nb_con_init_;
 };
 
 }  // namespace Buzz

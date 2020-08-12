@@ -142,12 +142,4 @@ std::vector<FileForChunck> GetChunckFiles(std::shared_ptr<Downloader> downloader
   return files_for_chuncks;
 }
 
-std::shared_ptr<parquet::FileMetaData> ReadMetadata(arrow::MemoryPool* mem_pool,
-                                                    std::shared_ptr<PartialFile> file) {
-  parquet::ReaderProperties props(mem_pool);
-  std::unique_ptr<parquet::ParquetFileReader> parquet_reader =
-      parquet::ParquetFileReader::Open(file, props, nullptr);
-  return parquet_reader->metadata();
-}
-
 }  // namespace Buzz

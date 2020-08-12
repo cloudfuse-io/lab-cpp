@@ -32,13 +32,13 @@
 using namespace Buzz;
 
 static const int MAX_CONCURRENT_DL = util::getenv_int("MAX_CONCURRENT_DL", 8);
-static const int NB_CONN_INIT = util::getenv_int("NB_CONN_INIT", 1);
+// static const int NB_CONN_INIT = util::getenv_int("NB_CONN_INIT", 1);
 static const auto mem_pool = new CustomMemoryPool(arrow::default_memory_pool());
 static const bool IS_LOCAL = util::getenv_bool("IS_LOCAL", false);
 
 static aws::lambda_runtime::invocation_response my_handler(
     aws::lambda_runtime::invocation_request const& req, const SdkOptions& options) {
-  Dispatcher dispatcher{mem_pool, options, MAX_CONCURRENT_DL, NB_CONN_INIT};
+  Dispatcher dispatcher{mem_pool, options, MAX_CONCURRENT_DL};
   dispatcher.execute({S3Path{"bb-test-data-dev", "bid-large.parquet"}},
                      Query{true,
                            {MetricAggretation{AggType::SUM, "cpm"},

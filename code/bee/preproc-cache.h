@@ -94,18 +94,12 @@ class PreprocCache {
     return Status::KeyError("RowGroup not found in cache");
   }
 
-  Result<std::shared_ptr<parquet::FileMetaData>> GetMetadata(std::string file) {
+  Result<std::tuple<std::shared_ptr<parquet::FileMetaData>, ColumnPhysicalPlans>>
+  GetMetadata(std::string file) {
     auto file_found = files.find(file);
     if (file_found != files.end()) {
-      return file_found->second.metadata;
-    }
-    return Status::KeyError("File not found in cache");
-  }
-
-  Result<ColumnPhysicalPlans> GetPhysicalPlans(std::string file) {
-    auto file_found = files.find(file);
-    if (file_found != files.end()) {
-      return file_found->second.col_phys_plans;
+      return std::make_tuple(file_found->second.metadata,
+                             file_found->second.col_phys_plans);
     }
     return Status::KeyError("File not found in cache");
   }

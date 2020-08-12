@@ -17,11 +17,10 @@
 
 #pragma once
 
-#include <arrow/buffer.h>
-#include <partial-file.h>
+#include <arrow/api.h>
+#include <result.h>
 
 #include <map>
-#include <optional>
 #include <set>
 
 namespace Buzz {
@@ -73,6 +72,17 @@ class ColumnCache {
       }
     }
     return std::nullopt;
+  }
+
+  Result<Columns> GetRowGroup(std::string file, int rg) {
+    auto file_found = files.find(file);
+    if (file_found != files.end()) {
+      auto rg_found = file_found->second.find(rg);
+      if (rg_found != file_found->second.end()) {
+        return rg_found->second;
+      }
+    }
+    return Status::KeyError("RowGroup not found in cache");
   }
 
  private:

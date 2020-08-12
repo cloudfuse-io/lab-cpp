@@ -25,12 +25,12 @@
 #include <iostream>
 #include <vector>
 
-#include "column-cache.h"
 #include "downloader.h"
 #include "logger.h"
 #include "parquet-helpers.h"
 #include "partial-file.h"
 #include "physical-plan.h"
+#include "preproc-cache.h"
 
 namespace Buzz {
 
@@ -56,21 +56,30 @@ Result<std::shared_ptr<arrow::ChunkedArray>> read_column_chunck(
 }
 }  // namespace
 
-Result<PreprocResult> PreprocessColumn(
+Result<PreprocCache::Column> PreprocessColumnMetadata(
+    Buzz::ColumnPhysicalPlans::ColumnPhysicalPlanPtr col_plan,
+    std::shared_ptr<parquet::FileMetaData> file_metadata) {
+  // TODO analyse metadata
+  // - only one value for group by
+  // - all true filter
+  // - all false filter
+  return Status::NotImplemented("Metadata preprocessing not implemented yet");
+}
+
+Result<PreprocCache::Column> PreprocessColumnFile(
     arrow::MemoryPool* mem_pool, std::shared_ptr<parquet::FileMetaData> file_metadata,
-    ColChunckFile& col_chunck_file) {
-  ARROW_ASSIGN_OR_RAISE(
-      auto raw_arrow,
-      read_column_chunck(mem_pool, col_chunck_file.file, file_metadata,
-                         col_chunck_file.row_group, col_chunck_file.column));
+    FileForChunck& chunck_file) {
+  ARROW_ASSIGN_OR_RAISE(auto raw_arrow,
+                        read_column_chunck(mem_pool, chunck_file.file, file_metadata,
+                                           chunck_file.row_group, chunck_file.column));
   // TODO complete other steps of the physical plan
-  return PreprocResult{false, raw_arrow};
+  return PreprocCache::Column{false, raw_arrow};
 }
 
 Status ProcessRowGroup(arrow::MemoryPool* mem_pool,
                        std::unique_ptr<parquet::RowGroupMetaData> rg_metadata,
                        ColumnPhysicalPlans& col_phys_plans, Query query,
-                       ColumnCache::Columns preproc_cols) {
+                       PreprocCache::RowGroup preproc_cols) {
   bool is_full_col = true;
   bool skip_rg = false;
   for (auto& col_plan : col_phys_plans) {

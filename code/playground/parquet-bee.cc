@@ -39,8 +39,8 @@ static const bool IS_LOCAL = util::getenv_bool("IS_LOCAL", false);
 static aws::lambda_runtime::invocation_response my_handler(
     aws::lambda_runtime::invocation_request const& req, const SdkOptions& options) {
   Dispatcher dispatcher{mem_pool, options, MAX_CONCURRENT_DL, NB_CONN_INIT};
-  dispatcher.execute(Query{S3Path{"bb-test-data-dev", "bid-large.parquet"},
-                           true,
+  dispatcher.execute({S3Path{"bb-test-data-dev", "bid-large.parquet"}},
+                     Query{true,
                            {MetricAggretation{AggType::SUM, "cpm"},
                             MetricAggretation{AggType::SUM, "cpmUplift"}}});
   return aws::lambda_runtime::invocation_response::success("Done", "text/plain");

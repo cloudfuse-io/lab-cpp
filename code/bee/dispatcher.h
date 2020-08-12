@@ -25,12 +25,12 @@
 #include <iostream>
 #include <vector>
 
-#include "column-cache.h"
 #include "downloader.h"
-#include "executor.h"
 #include "logger.h"
 #include "parquet-helpers.h"
 #include "partial-file.h"
+#include "preproc-cache.h"
+#include "processor.h"
 
 namespace Buzz {
 
@@ -47,98 +47,104 @@ class Dispatcher {
     nb_con_init_ = nb_con_init;
   }
 
-  Status execute(const Query& query) {
-    // download the footer of the file queried
-    metrics_manager_->EnterPhase("wait_foot");
-    auto file_metadata =
-        GetMetadata(downloader_, synchronizer_, mem_pool_, query.file, nb_con_init_);
-    metrics_manager_->ExitPhase("wait_foot");
-
-    // TODO plans for filters and group_bys
-    ColumnPhysicalPlans col_phys_plans;
-    for (auto& metric : query.metrics) {
-      auto plan = col_phys_plans.GetByName(metric.col_name);
-      if (!plan.ok()) {
-        plan = col_phys_plans.Insert(metric.col_name, file_metadata);
-      }
-      plan.ValueOrDie()->aggs.push_back(metric.agg_type);
+  Status execute(std::vector<S3Path> files, const Query& query) {
+    for (auto& file : files) {
+      // TODO max number of simulteanous footer dl ?
+      DownloadFooter(downloader_, file);
     }
-
-    // Filter row groups with metadata here (ParquetFileFragment::FilterRowGroups())
-    // For strings only min/max can be used (dict not available in footer)
-    ColumnCache column_cache;
-    for (int i = 0; i < file_metadata->num_row_groups(); i++) {
-      for (auto col_plan : col_phys_plans) {
-        // TODO analyse metadata
-        // - only one value for group by
-        // - all true filter
-        // - all false filter
-        bool skipable = false;
-        if (skipable) {
-          column_cache.AddColumn(query.file.ToString(), i, col_plan->col_id,
-                                 {true, nullptr});
-          // TODO process RowGroup if complete
-        }
-      }
-    }
-
-    // If plan cannot be solved from metadata, download column chuncks
-    // TODO a more progressive scheduling of new connections
-    int chuncks_to_dl = 0;
-    for (int i = 0; i < file_metadata->num_row_groups(); i++) {
-      for (auto col_plan : col_phys_plans) {
-        // TODO make sure the column is in the cache for the same query
-        if (!column_cache.GetColumn(query.file.ToString(), i, col_plan->col_id)
-                 .has_value()) {
-          DownloadColumnChunck(downloader_, file_metadata, query.file, i,
-                               col_plan->col_id);
-          chuncks_to_dl++;
-        }
-      }
-    }
-
     // Process results
-    int downloaded_chuncks = 0;
+    int col_chuncks_to_dl = 0;
+    int col_chuncks_downloaded = 0;
+    int footers_to_dl = files.size();
+    int footers_downloaded = 0;
+    PreprocCache preproc_cache;
     metrics_manager_->NewEvent("start_scheduler");
-    while (downloaded_chuncks < chuncks_to_dl) {
+    while (col_chuncks_downloaded < col_chuncks_to_dl ||
+           footers_downloaded < footers_to_dl) {
       metrics_manager_->EnterPhase("wait_dl");
       synchronizer_->wait();
       metrics_manager_->ExitPhase("wait_dl");
 
-      auto col_chunck_files = GetColumnChunckFiles(downloader_);
-      downloaded_chuncks += col_chunck_files.size();
-      for (auto& col_chunck_file : col_chunck_files) {
-        // pre-process columns
-        metrics_manager_->EnterPhase("col_proc");
-        metrics_manager_->NewEvent("starting_col_proc");
-        ARROW_ASSIGN_OR_RAISE(
-            auto col_proc_result,
-            PreprocessColumn(mem_pool_, file_metadata, col_chunck_file));
-        metrics_manager_->ExitPhase("col_proc");
+      auto chunck_files = GetChunckFiles(downloader_);
+      for (auto& chunck_file : chunck_files) {
+        if (chunck_file.row_group == -1) {
+          //// PROCESS FOOTER DOWNLOAD ////
+          footers_downloaded++;
+          auto file_metadata = ReadMetadata(mem_pool_, chunck_file.file);
 
-        // cache pre-process results
-        auto cols_for_rg =
-            column_cache.AddColumn(query.file.ToString(), col_chunck_file.row_group,
-                                   col_chunck_file.column, col_proc_result);
+          auto col_phys_plans = ColumnPhysicalPlans::Make(query, file_metadata);
 
-        // process row group once complete
-        if (col_phys_plans.check_complete(cols_for_rg)) {
-          metrics_manager_->EnterPhase("rg_proc");
-          metrics_manager_->NewEvent("starting_rg_proc");
+          preproc_cache.AddMetadata(chunck_file.path.ToString(), file_metadata,
+                                    col_phys_plans);
+
+          // Filter row groups with metadata here (ParquetFileFragment::FilterRowGroups())
+          // For strings only min/max can be used (dict not available in footer)
+          for (int i = 0; i < file_metadata->num_row_groups(); i++) {
+            for (auto col_plan : col_phys_plans) {
+              auto metadata_preproc = PreprocessColumnMetadata(col_plan, file_metadata);
+              if (metadata_preproc.ok()) {
+                preproc_cache.AddColumn(chunck_file.path.ToString(), i, col_plan->col_id,
+                                        metadata_preproc.ValueOrDie());
+                // TODO process RowGroup if complete
+              }
+            }
+          }
+
+          // If plan cannot be solved from metadata, download column chuncks
+          // TODO a more progressive scheduling of new connections
+          for (int i = 0; i < file_metadata->num_row_groups(); i++) {
+            for (auto col_plan : col_phys_plans) {
+              // TODO make sure the column is in the cache for the same query
+              if (!preproc_cache
+                       .GetColumn(chunck_file.path.ToString(), i, col_plan->col_id)
+                       .has_value()) {
+                DownloadColumnChunck(downloader_, file_metadata, chunck_file.path, i,
+                                     col_plan->col_id);
+                col_chuncks_to_dl++;
+              }
+            }
+          }
+        } else {
+          //// PROCESS COL CHUNCK DOWNLOAD ////
+          col_chuncks_downloaded++;
+          auto file_metadata =
+              preproc_cache.GetMetadata(chunck_file.path.ToString()).ValueOrDie();
+
+          auto col_phys_plans =
+              preproc_cache.GetPhysicalPlans(chunck_file.path.ToString()).ValueOrDie();
+
+          // pre-process columns
+          metrics_manager_->EnterPhase("col_proc");
+          metrics_manager_->NewEvent("starting_col_proc");
           ARROW_ASSIGN_OR_RAISE(
-              auto preproc_cols,
-              column_cache.GetRowGroup(query.file.ToString(), col_chunck_file.row_group));
-          RETURN_NOT_OK(ProcessRowGroup(
-              mem_pool_, file_metadata->RowGroup(col_chunck_file.row_group),
-              col_phys_plans, query, preproc_cols));
-          metrics_manager_->ExitPhase("rg_proc");
+              auto col_proc_result,
+              PreprocessColumnFile(mem_pool_, file_metadata, chunck_file));
+          metrics_manager_->ExitPhase("col_proc");
+
+          // cache pre-process results
+          auto cols_for_rg =
+              preproc_cache.AddColumn(chunck_file.path.ToString(), chunck_file.row_group,
+                                      chunck_file.column, col_proc_result);
+
+          // process row group once complete
+          if (col_phys_plans.check_complete(cols_for_rg)) {
+            metrics_manager_->EnterPhase("rg_proc");
+            metrics_manager_->NewEvent("starting_rg_proc");
+            ARROW_ASSIGN_OR_RAISE(auto preproc_cols,
+                                  preproc_cache.GetRowGroup(chunck_file.path.ToString(),
+                                                            chunck_file.row_group));
+            RETURN_NOT_OK(ProcessRowGroup(mem_pool_,
+                                          file_metadata->RowGroup(chunck_file.row_group),
+                                          col_phys_plans, query, preproc_cols));
+            metrics_manager_->ExitPhase("rg_proc");
+          }
         }
       }
     }
     metrics_manager_->NewEvent("processings_finished");
 
-    std::cout << "downloaded_chuncks:" << downloaded_chuncks << std::endl;
-    metrics_manager_->Print();
+    std::cout << "downloaded_chuncks:" << col_chuncks_downloaded << std::endl;
+    // metrics_manager_->Print();
     return Status::OK();
   }
 

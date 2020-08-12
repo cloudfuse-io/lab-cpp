@@ -17,8 +17,6 @@
 
 #pragma once
 
-#include <downloader.h>
-
 #include <optional>
 #include <vector>
 
@@ -49,7 +47,6 @@ struct TimeFilter {
 };
 
 struct Query {
-  S3Path file;
   // aggregs
   bool compute_count;
   std::vector<MetricAggretation> metrics;

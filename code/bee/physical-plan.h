@@ -37,6 +37,20 @@ class ColumnPhysicalPlans {
  public:
   using ColumnPhysicalPlanPtr = std::shared_ptr<ColumnPhysicalPlan>;
 
+  static ColumnPhysicalPlans Make(Query query,
+                                  std::shared_ptr<parquet::FileMetaData> file_metadata) {
+    ColumnPhysicalPlans col_phys_plans;
+    // TODO plans for filters and group_bys
+    for (auto& metric : query.metrics) {
+      auto plan = col_phys_plans.GetByName(metric.col_name);
+      if (!plan.ok()) {
+        plan = col_phys_plans.Insert(metric.col_name, file_metadata);
+      }
+      plan.ValueOrDie()->aggs.push_back(metric.agg_type);
+    }
+    return col_phys_plans;
+  }
+
   Result<ColumnPhysicalPlanPtr> GetById(int col_id) {
     for (auto& plan : plans) {
       if (plan->col_id == col_id) {
@@ -53,17 +67,6 @@ class ColumnPhysicalPlans {
       }
     }
     return Status::KeyError("name not found");
-  }
-
-  ColumnPhysicalPlanPtr Insert(std::string col_name,
-                               std::shared_ptr<parquet::FileMetaData> file_metadata) {
-    for (int i; i < file_metadata->schema()->num_columns(); i++) {
-      if (col_name == file_metadata->schema()->Column(i)->name()) {
-        plans.emplace_back(
-            std::make_shared<ColumnPhysicalPlan>(ColumnPhysicalPlan{col_name, i}));
-        return plans.at(plans.size() - 1);
-      }
-    }
   }
 
   std::vector<ColumnPhysicalPlanPtr>::iterator begin() { return plans.begin(); }
@@ -88,6 +91,17 @@ class ColumnPhysicalPlans {
 
  private:
   std::vector<ColumnPhysicalPlanPtr> plans;
+
+  ColumnPhysicalPlanPtr Insert(std::string col_name,
+                               std::shared_ptr<parquet::FileMetaData> file_metadata) {
+    for (int i; i < file_metadata->schema()->num_columns(); i++) {
+      if (col_name == file_metadata->schema()->Column(i)->name()) {
+        plans.emplace_back(
+            std::make_shared<ColumnPhysicalPlan>(ColumnPhysicalPlan{col_name, i}));
+        return plans.at(plans.size() - 1);
+      }
+    }
+  }
 };
 
 }  // namespace Buzz

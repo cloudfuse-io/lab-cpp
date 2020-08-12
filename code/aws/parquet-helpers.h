@@ -88,26 +88,32 @@ std::shared_ptr<parquet::FileMetaData> GetMetadata(
   return file_metadata;
 }
 
+void DownloadFooter(std::shared_ptr<Downloader> downloader, S3Path path) {
+  DownloadRequest request{std::nullopt, 64 * 1024, path};
+  downloader->ScheduleDownload(request);
+}
+
 void DownloadColumnChunck(std::shared_ptr<Downloader> downloader,
                           std::shared_ptr<parquet::FileMetaData> file_metadata,
                           S3Path path, int row_group, int column) {
   auto col_chunck_meta = file_metadata->RowGroup(row_group)->ColumnChunk(column);
   auto col_chunck_start = col_chunck_meta->file_offset();
   auto col_chunck_end = col_chunck_start + col_chunck_meta->total_compressed_size();
-  downloader->ScheduleDownload({col_chunck_start, col_chunck_end, path});
-  rg_start_map.emplace(DownloadRequest{col_chunck_start, col_chunck_end, path},
-                       ParquetColumnChunckIds{row_group, column});
+  DownloadRequest request{col_chunck_start, col_chunck_end, path};
+  downloader->ScheduleDownload(request);
+  rg_start_map.emplace(request, ParquetColumnChunckIds{row_group, column});
 }
 
-struct ColChunckFile {
+struct FileForChunck {
+  S3Path path;
   int row_group;
   int column;
   std::shared_ptr<PartialFile> file;
 };
 
-std::vector<ColChunckFile> GetColumnChunckFiles(std::shared_ptr<Downloader> downloader) {
+std::vector<FileForChunck> GetChunckFiles(std::shared_ptr<Downloader> downloader) {
   auto results = downloader->ProcessResponses();
-  std::vector<ColChunckFile> rg_files;
+  std::vector<FileForChunck> files_for_chuncks;
   for (auto& result : results) {
     if (result.status().message() == STATUS_ABORTED.message()) {
       continue;
@@ -117,13 +123,31 @@ std::vector<ColChunckFile> GetColumnChunckFiles(std::shared_ptr<Downloader> down
         response.request.range_end == 0) {
       continue;
     }
-    std::vector<FileChunck> rg_chuncks{
-        {response.request.range_start.value(), response.raw_data}};
-    auto chunck_ids = rg_start_map[response.request];
-    rg_files.push_back({chunck_ids.row_group, chunck_ids.column,
-                        std::make_shared<PartialFile>(rg_chuncks, response.file_size)});
+    if (!response.request.range_start.has_value() && response.request.range_end != 0) {
+      // create chunck file with footer to generate metadata
+      auto footer_start_pos = response.file_size - response.request.range_end;
+      std::vector<FileChunck> footer_chuncks{{footer_start_pos, response.raw_data}};
+      auto foot_file = std::make_shared<PartialFile>(footer_chuncks, response.file_size);
+      files_for_chuncks.push_back({response.request.path, -1, -1, foot_file});
+    } else {
+      // create chunck file with range for specific col chunck
+      std::vector<FileChunck> rg_chuncks{
+          {response.request.range_start.value(), response.raw_data}};
+      auto chunck_ids = rg_start_map[response.request];
+      auto col_chunk_file = std::make_shared<PartialFile>(rg_chuncks, response.file_size);
+      files_for_chuncks.push_back({response.request.path, chunck_ids.row_group,
+                                   chunck_ids.column, col_chunk_file});
+    }
   }
-  return rg_files;
+  return files_for_chuncks;
+}
+
+std::shared_ptr<parquet::FileMetaData> ReadMetadata(arrow::MemoryPool* mem_pool,
+                                                    std::shared_ptr<PartialFile> file) {
+  parquet::ReaderProperties props(mem_pool);
+  std::unique_ptr<parquet::ParquetFileReader> parquet_reader =
+      parquet::ParquetFileReader::Open(file, props, nullptr);
+  return parquet_reader->metadata();
 }
 
 }  // namespace Buzz

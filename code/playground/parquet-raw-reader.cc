@@ -27,7 +27,7 @@
 #include "cust_memory_pool.h"
 #include "downloader.h"
 #include "logger.h"
-#include "parquet-helpers.h"
+#include "parquet-helper.h"
 #include "partial-file.h"
 #include "sdk-init.h"
 #include "stats.h"
@@ -88,17 +88,19 @@ static aws::lambda_runtime::invocation_response my_handler(
   auto downloader = std::make_shared<Downloader>(synchronizer, MAX_CONCURRENT_DL,
                                                  metrics_manager, options);
 
+  ParquetHelper parquet_helper{downloader};
+
   S3Path file_path{"bb-test-data-dev", "bid-large.parquet"};
 
   auto file_metadata =
-      GetMetadata(downloader, synchronizer, mem_pool, file_path, NB_CONN_INIT);
+      parquet_helper.GetMetadata(synchronizer, mem_pool, file_path, NB_CONN_INIT);
 
   metrics_manager->ExitPhase("wait_foot");
 
   // Download column chuncks
   for (int i = 0; i < file_metadata->num_row_groups(); i++) {
     // TODO a more progressive scheduling of new connections
-    DownloadColumnChunck(downloader, file_metadata, file_path, i, COLUMN_ID);
+    parquet_helper.DownloadColumnChunck(file_metadata, file_path, i, COLUMN_ID);
   }
 
   // Process chuncks
@@ -109,7 +111,7 @@ static aws::lambda_runtime::invocation_response my_handler(
     metrics_manager->EnterPhase("wait_dl");
     synchronizer->wait();
     metrics_manager->ExitPhase("wait_dl");
-    auto col_chunck_files = GetChunckFiles(downloader);
+    auto col_chunck_files = parquet_helper.GetChunckFiles();
     for (auto& col_chunck_file : col_chunck_files) {
       metrics_manager->EnterPhase("proc");
       metrics_manager->NewEvent("starting_proc");

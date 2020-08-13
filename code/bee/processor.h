@@ -28,7 +28,7 @@
 
 #include "downloader.h"
 #include "logger.h"
-#include "parquet-helpers.h"
+#include "parquet-helper.h"
 #include "partial-file.h"
 #include "physical-plan.h"
 #include "preproc-cache.h"
@@ -51,7 +51,8 @@ class Processor {
   }
 
   Result<PreprocCache::Column> PreprocessColumnFile(
-      std::shared_ptr<parquet::FileMetaData> file_metadata, FileForChunck& chunck_file) {
+      std::shared_ptr<parquet::FileMetaData> file_metadata,
+      ParquetHelper::ChunckFile& chunck_file) {
     ARROW_ASSIGN_OR_RAISE(auto raw_arrow,
                           read_column_chunck(chunck_file.file, file_metadata,
                                              chunck_file.row_group, chunck_file.column));

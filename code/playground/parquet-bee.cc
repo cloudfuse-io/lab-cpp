@@ -24,7 +24,7 @@
 #include "dispatcher.h"
 #include "downloader.h"
 #include "logger.h"
-#include "parquet-helpers.h"
+#include "parquet-helper.h"
 #include "partial-file.h"
 #include "sdk-init.h"
 #include "toolbox.h"
@@ -39,6 +39,7 @@ static const bool IS_LOCAL = util::getenv_bool("IS_LOCAL", false);
 static aws::lambda_runtime::invocation_response my_handler(
     aws::lambda_runtime::invocation_request const& req, const SdkOptions& options) {
   Dispatcher dispatcher{mem_pool, options, MAX_CONCURRENT_DL};
+  std::cout << "dispatcher.execute" << std::endl;
   dispatcher.execute({S3Path{"bb-test-data-dev", "bid-large.parquet"}},
                      Query{true,
                            {MetricAggretation{AggType::SUM, "cpm"},

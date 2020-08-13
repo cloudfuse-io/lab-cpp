@@ -27,7 +27,7 @@
 
 #include "downloader.h"
 #include "logger.h"
-#include "parquet-helpers.h"
+#include "parquet-helper.h"
 #include "partial-file.h"
 #include "preproc-cache.h"
 #include "processor.h"
@@ -38,18 +38,16 @@ class Dispatcher {
  public:
   Dispatcher(arrow::MemoryPool* mem_pool, const SdkOptions& options,
              int max_concurrent_dl)
-      : processor_(mem_pool) {
-    synchronizer_ = std::make_shared<Synchronizer>();
-    metrics_manager_ = std::make_shared<MetricsManager>();
-
-    downloader_ = std::make_shared<Downloader>(synchronizer_, max_concurrent_dl,
-                                               metrics_manager_, options);
-  }
+      : processor_(std::make_unique<Processor>(mem_pool)),
+        synchronizer_(std::make_shared<Synchronizer>()),
+        metrics_manager_(std::make_shared<MetricsManager>()),
+        parquet_helper_(std::make_unique<ParquetHelper>(std::make_shared<Downloader>(
+            synchronizer_, max_concurrent_dl, metrics_manager_, options))) {}
 
   Status execute(std::vector<S3Path> files, const Query& query) {
     for (auto& file : files) {
       // TODO max number of simulteanous footer dl ?
-      DownloadFooter(downloader_, file);
+      parquet_helper_->DownloadFooter(file);
     }
     // Process results
     int col_chuncks_to_dl = 0;
@@ -64,12 +62,12 @@ class Dispatcher {
       synchronizer_->wait();
       metrics_manager_->ExitPhase("wait_dl");
 
-      auto chunck_files = GetChunckFiles(downloader_);
+      auto chunck_files = parquet_helper_->GetChunckFiles();
       for (auto& chunck_file : chunck_files) {
         if (chunck_file.row_group == -1) {
           //// PROCESS FOOTER DOWNLOAD ////
           footers_downloaded++;
-          auto file_metadata = processor_.ReadMetadata(chunck_file.file);
+          auto file_metadata = processor_->ReadMetadata(chunck_file.file);
 
           auto col_phys_plans = ColumnPhysicalPlans::Make(query, file_metadata);
 
@@ -81,7 +79,7 @@ class Dispatcher {
           for (int i = 0; i < file_metadata->num_row_groups(); i++) {
             for (auto col_plan : col_phys_plans) {
               auto metadata_preproc =
-                  processor_.PreprocessColumnMetadata(col_plan, file_metadata, i);
+                  processor_->PreprocessColumnMetadata(col_plan, file_metadata, i);
               if (metadata_preproc.has_value()) {
                 preproc_cache.AddColumn(chunck_file.path.ToString(), i, col_plan->col_id,
                                         metadata_preproc.value());
@@ -98,8 +96,8 @@ class Dispatcher {
               if (!preproc_cache
                        .GetColumn(chunck_file.path.ToString(), i, col_plan->col_id)
                        .has_value()) {
-                DownloadColumnChunck(downloader_, file_metadata, chunck_file.path, i,
-                                     col_plan->col_id);
+                parquet_helper_->DownloadColumnChunck(file_metadata, chunck_file.path, i,
+                                                      col_plan->col_id);
                 col_chuncks_to_dl++;
               }
             }
@@ -113,7 +111,7 @@ class Dispatcher {
           // pre-process columns
           metrics_manager_->EnterPhase("col_proc");
           metrics_manager_->NewEvent("starting_col_proc");
-          ARROW_ASSIGN_OR_RAISE(auto col_proc_result, processor_.PreprocessColumnFile(
+          ARROW_ASSIGN_OR_RAISE(auto col_proc_result, processor_->PreprocessColumnFile(
                                                           file_metadata, chunck_file));
           metrics_manager_->ExitPhase("col_proc");
 
@@ -129,9 +127,9 @@ class Dispatcher {
             ARROW_ASSIGN_OR_RAISE(auto preproc_cols,
                                   preproc_cache.GetRowGroup(chunck_file.path.ToString(),
                                                             chunck_file.row_group));
-            RETURN_NOT_OK(
-                processor_.ProcessRowGroup(file_metadata->RowGroup(chunck_file.row_group),
-                                           col_phys_plans, query, preproc_cols));
+            RETURN_NOT_OK(processor_->ProcessRowGroup(
+                file_metadata->RowGroup(chunck_file.row_group), col_phys_plans, query,
+                preproc_cols));
             metrics_manager_->ExitPhase("rg_proc");
           }
         }
@@ -145,10 +143,10 @@ class Dispatcher {
   }
 
  private:
-  Processor processor_;
+  std::unique_ptr<Processor> processor_;
   std::shared_ptr<Synchronizer> synchronizer_;
   std::shared_ptr<MetricsManager> metrics_manager_;
-  std::shared_ptr<Downloader> downloader_;
+  std::unique_ptr<ParquetHelper> parquet_helper_;
 };
 
 }  // namespace Buzz

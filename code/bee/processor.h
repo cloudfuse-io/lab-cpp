@@ -50,7 +50,9 @@ class Processor {
     return std::nullopt;
   }
 
+  /// Solve the query plan from the actual column
   Result<PreprocCache::Column> PreprocessColumnFile(
+      Buzz::ColumnPhysicalPlans::ColumnPhysicalPlanPtr col_plan,
       std::shared_ptr<parquet::FileMetaData> file_metadata,
       ParquetHelper::ChunckFile& chunck_file) {
     ARROW_ASSIGN_OR_RAISE(auto raw_arrow,
@@ -60,6 +62,7 @@ class Processor {
     return PreprocCache::Column{false, raw_arrow};
   }
 
+  /// Put preprocessed columns for a rowgroup together and finish query plan
   Status ProcessRowGroup(std::unique_ptr<parquet::RowGroupMetaData> rg_metadata,
                          ColumnPhysicalPlans& col_phys_plans, Query query,
                          PreprocCache::RowGroup preproc_cols) {

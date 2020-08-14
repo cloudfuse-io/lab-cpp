@@ -111,8 +111,11 @@ class Dispatcher {
           // pre-process columns
           metrics_manager_->EnterPhase("col_proc");
           metrics_manager_->NewEvent("starting_col_proc");
-          ARROW_ASSIGN_OR_RAISE(auto col_proc_result, processor_->PreprocessColumnFile(
-                                                          file_metadata, chunck_file));
+          ARROW_ASSIGN_OR_RAISE(
+              auto col_proc_result,
+              processor_->PreprocessColumnFile(
+                  col_phys_plans.GetById(chunck_file.column).ValueOrDie(), file_metadata,
+                  chunck_file));
           metrics_manager_->ExitPhase("col_proc");
 
           // cache pre-process results

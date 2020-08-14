@@ -31,6 +31,7 @@ class ParquetHelper {
  public:
   ParquetHelper(std::shared_ptr<Downloader> downloader) : downloader_(downloader) {}
 
+  /// download the footer for the given file synchronoushly and parses it
   std::shared_ptr<parquet::FileMetaData> GetMetadata(
       std::shared_ptr<Synchronizer> synchronizer, arrow::MemoryPool* mem_pool,
       S3Path path, int nb_init) {
@@ -67,11 +68,13 @@ class ParquetHelper {
     return file_metadata;
   }
 
+  /// Queue footer download
   void DownloadFooter(S3Path path) {
     DownloadRequest request{std::nullopt, 64 * 1024, path};
     downloader_->ScheduleDownload(request);
   }
 
+  /// Queue column chunck download download
   void DownloadColumnChunck(std::shared_ptr<parquet::FileMetaData> file_metadata,
                             S3Path path, int row_group, int column) {
     auto col_chunck_meta = file_metadata->RowGroup(row_group)->ColumnChunk(column);
@@ -79,7 +82,7 @@ class ParquetHelper {
     auto col_chunck_end = col_chunck_start + col_chunck_meta->total_compressed_size();
     DownloadRequest request{col_chunck_start, col_chunck_end, path};
     downloader_->ScheduleDownload(request);
-    rg_start_map.emplace(request, ParquetColumnChunckIds{row_group, column});
+    rg_start_map.emplace(request, ColumnChunckIds{row_group, column});
   }
 
   struct ChunckFile {
@@ -89,6 +92,7 @@ class ParquetHelper {
     std::shared_ptr<PartialFile> file;
   };
 
+  /// Get results from the downloader and attach them back their Parquet properties
   std::vector<ChunckFile> GetChunckFiles() {
     auto results = downloader_->ProcessResponses();
     std::vector<ChunckFile> parquet_chunck_files;
@@ -136,13 +140,12 @@ class ParquetHelper {
     }
   };
 
-  struct ParquetColumnChunckIds {
+  struct ColumnChunckIds {
     int row_group;
     int column;
   };
 
-  std::unordered_map<DownloadRequest, ParquetColumnChunckIds, RequestWeakHash,
-                     RequestEqual>
+  std::unordered_map<DownloadRequest, ColumnChunckIds, RequestWeakHash, RequestEqual>
       rg_start_map;
   std::shared_ptr<Downloader> downloader_;
 };

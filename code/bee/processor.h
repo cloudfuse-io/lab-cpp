@@ -55,11 +55,56 @@ class Processor {
       Buzz::ColumnPhysicalPlans::ColumnPhysicalPlanPtr col_plan,
       std::shared_ptr<parquet::FileMetaData> file_metadata,
       ParquetHelper::ChunckFile& chunck_file) {
-    ARROW_ASSIGN_OR_RAISE(auto raw_arrow,
-                          read_column_chunck(chunck_file.file, file_metadata,
-                                             chunck_file.row_group, chunck_file.column));
-    // TODO complete other steps of the physical plan
-    return PreprocCache::Column{false, raw_arrow};
+    ARROW_ASSIGN_OR_RAISE(
+        auto raw_arrow,
+        read_column_chunck(chunck_file.file, file_metadata, col_plan->read_dict,
+                           chunck_file.row_group, chunck_file.column));
+    auto result_arrow = raw_arrow;
+    if (col_plan->create_filter_index) {
+      // create filter index set
+    }
+    if (col_plan->create_bitset) {
+      if (col_plan->filter_expression->ToString() == "TimeFilter") {
+        if (raw_arrow->type()->name() != "timestamp") {
+          return Status::TypeError("Timestamp column read as arrow " +
+                                   raw_arrow->type()->name());
+        }
+
+        auto expression =
+            std::dynamic_pointer_cast<TimeExpression>(col_plan->filter_expression);
+        auto timestamp_type =
+            std::dynamic_pointer_cast<arrow::TimestampType>(raw_arrow->type());
+        if (!expression || !timestamp_type) {
+          return Status::ExpressionValidationError("Invalid cast");
+        }
+
+        // create lower bound bitset
+        ARROW_ASSIGN_OR_RAISE(auto start_scalar,
+                              TimePointToScalar(expression->lower, timestamp_type));
+        ARROW_ASSIGN_OR_RAISE(
+            auto start_result,
+            arrow::compute::Compare(raw_arrow, arrow::Datum(start_scalar),
+                                    arrow::compute::CompareOptions{
+                                        arrow::compute::CompareOperator::GREATER_EQUAL}));
+
+        // create upper bound bitset
+        ARROW_ASSIGN_OR_RAISE(auto end_scalar,
+                              TimePointToScalar(expression->upper, timestamp_type));
+        ARROW_ASSIGN_OR_RAISE(
+            auto end_result,
+            arrow::compute::Compare(
+                raw_arrow, arrow::Datum(end_scalar),
+                arrow::compute::CompareOptions{arrow::compute::CompareOperator::LESS}));
+
+        ARROW_ASSIGN_OR_RAISE(auto start_and_end_result,
+                              arrow::compute::And(start_result, end_result));
+
+        result_arrow = start_and_end_result.chunked_array();
+      }
+      // TODO shortcut when all false
+    }
+
+    return PreprocCache::Column(result_arrow);
   }
 
   /// Put preprocessed columns for a rowgroup together and finish query plan
@@ -68,10 +113,34 @@ class Processor {
                          PreprocCache::RowGroup preproc_cols) {
     bool is_full_col = true;
     bool skip_rg = false;
+    bool has_group_by = false;
+    auto filter = PreprocCache::Column{std::make_shared<arrow::BooleanScalar>(true)};
     for (auto& col_plan : col_phys_plans) {
-      // if is filter and all false  => skip_col=true + break
-      // if is filter and not all true => is_full_col=false
-      // if is group_by and nb_values > 1 => is_full_col=false
+      if (col_plan->filter_expression) {
+        is_full_col = false;
+        auto col = preproc_cols[col_plan->col_id];
+        if (col.are_all_equal() && col.are_all_true()) {
+          // this is a noop filter
+        } else if (col.are_all_equal()) {
+          // this row group can be skipped
+          skip_rg = true;
+          break;
+        } else if (col_plan->create_bitset) {
+          // this should be merged to existing filter
+          if (filter.are_all_equal() && filter.are_all_true()) {
+            filter = PreprocCache::Column(col.get_datum().chunked_array());
+          } else {
+            ARROW_ASSIGN_OR_RAISE(
+                auto merged_datum,
+                arrow::compute::And(filter.get_datum(), col.get_datum()));
+            filter = PreprocCache::Column(merged_datum.chunked_array());
+          }
+        }
+      }
+      if (col_plan->group_by_expression) {
+        is_full_col = false;
+        has_group_by = true;
+      }
     }
     if (skip_rg) {
       if (query.compute_count) {
@@ -95,8 +164,8 @@ class Processor {
         for (auto& agg : col_plan->aggs) {
           auto preproc_res = preproc_cols[col_plan->col_id];
           if (agg == AggType::SUM) {
-            auto column_datum = arrow::Datum(preproc_res.array);
-            ARROW_ASSIGN_OR_RAISE(auto result_datum, arrow::compute::Sum(column_datum));
+            ARROW_ASSIGN_OR_RAISE(auto result_datum,
+                                  arrow::compute::Sum(preproc_res.get_datum()));
             std::cout << "SUM(" << col_plan->col_name
                       << ")=" << result_datum.scalar()->ToString() << std::endl;
           } else {
@@ -106,9 +175,36 @@ class Processor {
       }
     } else {
       // if multiple bitset filters, "and" them
-      // if no group by create a mock one
-      // run hash aggreg (merging with bitset filter)
-      return Status::NotImplemented("Filters and GroupBy not implem");
+      if (has_group_by) {
+        return Status::NotImplemented("Group by not implemented");
+      } else {
+        std::string count = "";
+        for (auto& col_plan : col_phys_plans) {
+          for (auto& agg : col_plan->aggs) {
+            auto preproc_res = preproc_cols[col_plan->col_id];
+            ARROW_ASSIGN_OR_RAISE(
+                auto filtered_datum,
+                arrow::compute::Filter(preproc_res.get_datum(), filter.get_datum()));
+            count = std::to_string(filtered_datum.chunked_array()->length());
+            if (agg == AggType::SUM) {
+              ARROW_ASSIGN_OR_RAISE(auto result_datum,
+                                    arrow::compute::Sum(filtered_datum));
+              std::cout << "SUM(" << col_plan->col_name
+                        << ")=" << result_datum.scalar()->ToString() << std::endl;
+            } else {
+              std::cout << "UNKOWN_AGG_TYPE" << std::endl;
+            }
+          }
+        }
+        if (query.compute_count) {
+          if (count == "") {
+            ARROW_ASSIGN_OR_RAISE(auto count_datum,
+                                  arrow::compute::Sum(filter.get_datum()));
+            count = count_datum.scalar()->ToString();
+          }
+          std::cout << "COUNT=" << count << std::endl;
+        }
+      }
     }
     return Status::OK();
   }
@@ -125,7 +221,8 @@ class Processor {
 
   Result<std::shared_ptr<arrow::ChunkedArray>> read_column_chunck(
       std::shared_ptr<arrow::io::RandomAccessFile> rg_file,
-      std::shared_ptr<parquet::FileMetaData> file_metadata, int rg, int col_id) {
+      std::shared_ptr<parquet::FileMetaData> file_metadata, bool is_dict, int rg,
+      int col_id) {
     std::unique_ptr<parquet::arrow::FileReader> reader;
     parquet::arrow::FileReaderBuilder builder;
     parquet::ReaderProperties parquet_props(mem_pool_);
@@ -133,7 +230,6 @@ class Processor {
     builder.memory_pool(mem_pool_);
     // all strings are viewed as dicts
     auto arrow_props = parquet::ArrowReaderProperties();
-    bool is_dict = file_metadata->schema()->Column(col_id)->logical_type()->is_string();
     arrow_props.set_read_dictionary(col_id, is_dict);
     builder.properties(arrow_props);
     PARQUET_THROW_NOT_OK(builder.Build(&reader));
@@ -142,6 +238,25 @@ class Processor {
     PARQUET_THROW_NOT_OK(reader->RowGroup(rg)->Column(col_id)->Read(&array));
     return array;
   }
-};
+
+  /// source time in ms since epoch
+  Result<std::shared_ptr<arrow::TimestampScalar>> TimePointToScalar(
+      int64_t source, std::shared_ptr<arrow::TimestampType> timestamp_type) {
+    int64_t target_int;
+    if (timestamp_type->unit() == arrow::TimeUnit::SECOND) {
+      target_int = source / 1000;
+    } else if (timestamp_type->unit() == arrow::TimeUnit::MILLI) {
+      target_int = source;
+    } else if (timestamp_type->unit() == arrow::TimeUnit::MICRO) {
+      target_int = source * 1000;
+    } else if (timestamp_type->unit() == arrow::TimeUnit::NANO) {
+      target_int = source * 1000000;
+    } else {
+      return Status::ExpressionValidationError(
+          "Unexpected timestamp unit in arrow array, got " + timestamp_type->unit());
+    }
+    return std::make_shared<arrow::TimestampScalar>(target_int, timestamp_type);
+  }
+};  // namespace Buzz
 
 }  // namespace Buzz

@@ -14,53 +14,26 @@
 // KIND, either express or implied. See the License for the
 // specific language governing permissions and limitations
 // under the License.
+#include "toolbox.h"
 
-#pragma once
-
-#include <optional>
-#include <vector>
+#include <gmock/gmock-matchers.h>
+#include <gtest/gtest.h>
 
 namespace Buzz {
 
-enum class AggType { SUM };
+using namespace testing;
 
-enum class TimeBucket { HOUR };
+TEST(Toolbox, get_duration_ms) {
+  auto current_time = time::now();
+  ASSERT_EQ(util::get_duration_ms(current_time, current_time + std::chrono::minutes(1)),
+            60 * 1000);
+}
 
-struct TimeGrouping {
-  TimeBucket bucket;
-  std::string col_name;
-};
-
-struct MetricAggregation {
-  AggType agg_type;
-  std::string col_name;
-};
-
-struct TagFilter {
-  std::vector<std::string> values;
-  bool exclude;
-  std::string col_name;
-};
-
-// start and end are ms since epoch
-struct TimeFilter {
-  int64_t start;
-  int64_t end;
-  std::string col_name;
-};
-
-struct Query {
-  // aggregs
-  bool compute_count;
-  std::vector<MetricAggregation> metrics;
-  // groupings
-  std::vector<std::string> tag_groupings;
-  std::optional<TimeGrouping> time_grouping;
-  // filters
-  std::vector<TagFilter> tag_filters;
-  std::optional<TimeFilter> time_filter;
-  // limit
-  int64_t limit;
-};
+TEST(Toolbox, get_duration_micro) {
+  auto current_time = time::now();
+  ASSERT_EQ(
+      util::get_duration_micro(current_time, current_time + std::chrono::minutes(1)),
+      60 * 1000 * 1000);
+}
 
 }  // namespace Buzz

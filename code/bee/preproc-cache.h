@@ -28,13 +28,22 @@ namespace Buzz {
 
 class PreprocCache {
  public:
-  struct Column {
-    // TODO better materialize preproc result:
-    // - only one value for group by
-    // - all true filter
-    // - all false filter
-    bool skippable = false;
-    std::shared_ptr<arrow::ChunkedArray> array;
+  /// TODO abstraction not very usefull...
+  class Column {
+   public:
+    Column() : data_(){};
+    Column(std::shared_ptr<arrow::Scalar> scalar) : data_(std::move(scalar)) {}
+    Column(std::shared_ptr<arrow::ChunkedArray> array) : data_(std::move(array)) {}
+
+    bool are_all_equal() { return data_.is_scalar(); }
+
+    // only valid if are_all_equal() returned true
+    bool are_all_true() { return data_.scalar()->Equals(arrow::BooleanScalar(true)); }
+
+    arrow::Datum get_datum() { return data_; }
+
+   private:
+    arrow::Datum data_;
   };
   using RowGroup = std::map<int, Column>;
   struct File {

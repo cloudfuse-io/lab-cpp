@@ -69,7 +69,8 @@ class Dispatcher {
           footers_downloaded++;
           auto file_metadata = processor_->ReadMetadata(chunck_file.file);
 
-          auto col_phys_plans = ColumnPhysicalPlans::Make(query, file_metadata);
+          ARROW_ASSIGN_OR_RAISE(auto col_phys_plans,
+                                ColumnPhysicalPlans::Make(query, file_metadata));
 
           preproc_cache.AddMetadata(chunck_file.path.ToString(), file_metadata,
                                     col_phys_plans);

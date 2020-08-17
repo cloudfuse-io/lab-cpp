@@ -21,6 +21,7 @@
 
 #include <chrono>
 #include <cstring>
+#include <ctime>
 #include <string>
 
 namespace Buzz {

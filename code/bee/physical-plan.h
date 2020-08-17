@@ -23,30 +23,88 @@
 #include <vector>
 
 namespace Buzz {
+struct FilterExpression {
+  virtual std::string ToString() const = 0;
+};
+
+/// lower and upper are ms since epoch
+struct TimeExpression : public FilterExpression {
+  int64_t lower;
+  int64_t upper;
+
+  TimeExpression(int64_t start, int64_t end) : lower(start), upper(end) {}
+
+  std::string ToString() const override { return "TimeFilter"; }
+};
+
+struct GroupByExpression {};
 
 /// Caracterize the pre-processing steps
 struct ColumnPhysicalPlan {
   std::string col_name;
   int col_id;
-  bool is_filter;
-  bool is_group_by;
+  bool read_dict;
+  bool create_filter_index;
+  bool create_bitset;
+
+  // the selection step of the plan
+  std::shared_ptr<FilterExpression> filter_expression;
+
+  // the group by step of the plan
+  std::shared_ptr<GroupByExpression> group_by_expression;
+
+  // bool is_filter;
+  // bool is_group_by;
   std::vector<AggType> aggs;
 };
 
+/// A column by column set of physical plans
 class ColumnPhysicalPlans {
  public:
   using ColumnPhysicalPlanPtr = std::shared_ptr<ColumnPhysicalPlan>;
 
-  static ColumnPhysicalPlans Make(Query query,
-                                  std::shared_ptr<parquet::FileMetaData> file_metadata) {
+  static Result<ColumnPhysicalPlans> Make(
+      Query query, std::shared_ptr<parquet::FileMetaData> file_metadata) {
     ColumnPhysicalPlans col_phys_plans;
     // TODO plans for filters and group_bys
     for (auto& metric : query.metrics) {
-      auto plan = col_phys_plans.GetByName(metric.col_name);
-      if (!plan.ok()) {
-        plan = col_phys_plans.Insert(metric.col_name, file_metadata);
+      auto plan_res = col_phys_plans.GetByName(metric.col_name);
+      if (!plan_res.ok()) {
+        plan_res = col_phys_plans.Insert(metric.col_name, file_metadata);
       }
-      plan.ValueOrDie()->aggs.push_back(metric.agg_type);
+      auto plan_ptr = plan_res.ValueOrDie();
+      auto parquet_log_type =
+          file_metadata->schema()->Column(plan_ptr->col_id)->logical_type();
+      // logical type often left "none" when physical type is clear primitive
+      // TODO check the exact rule for this
+      if (!parquet_log_type->is_int() && !parquet_log_type->is_decimal() &&
+          !parquet_log_type->is_none()) {
+        return Status::TypeError("Metric should by a Parquet numeric column, got ",
+                                 parquet_log_type->ToString());
+      }
+      plan_ptr->aggs.push_back(metric.agg_type);
+      plan_ptr->read_dict = false;
+      plan_ptr->create_filter_index = false;
+      plan_ptr->create_bitset = false;
+    }
+    if (query.time_filter.has_value()) {
+      auto filter = query.time_filter.value();
+      auto plan_res = col_phys_plans.GetByName(filter.col_name);
+      if (!plan_res.ok()) {
+        plan_res = col_phys_plans.Insert(filter.col_name, file_metadata);
+      }
+      auto plan_ptr = plan_res.ValueOrDie();
+      auto parquet_log_type =
+          file_metadata->schema()->Column(plan_ptr->col_id)->logical_type();
+      if (!parquet_log_type->is_timestamp()) {
+        return Status::TypeError("Time filter should be a Parquet timestamp column, got ",
+                                 parquet_log_type->ToString());
+      }
+      plan_ptr->read_dict = false;
+      plan_ptr->create_filter_index = false;
+      plan_ptr->create_bitset = true;
+      plan_ptr->filter_expression =
+          std::make_shared<TimeExpression>(filter.start, filter.end);
     }
     return col_phys_plans;
   }
@@ -73,6 +131,7 @@ class ColumnPhysicalPlans {
 
   std::vector<ColumnPhysicalPlanPtr>::iterator end() { return plans.end(); }
 
+  /// check that the set of column ids contain all the necessary columns for this plan set
   bool check_complete(std::set<int>& cols_for_rg) const {
     for (auto& col_plan : plans) {
       bool col_found = false;

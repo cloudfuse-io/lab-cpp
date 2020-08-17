@@ -36,14 +36,30 @@ static const int MAX_CONCURRENT_DL = util::getenv_int("MAX_CONCURRENT_DL", 8);
 static const auto mem_pool = new CustomMemoryPool(arrow::default_memory_pool());
 static const bool IS_LOCAL = util::getenv_bool("IS_LOCAL", false);
 
+// January 1, 2020 0:00:00
+// static const int64_t START_TS = util::getenv_int("START_TS", 1577836800000);
+
+// flextime
+static const int64_t START_TS = util::getenv_int("START_TS", 1596240000000);
+
+// August 1, 2020 0:00:00
+static const int64_t END_TS = util::getenv_int("END_TS", 1596240000000);
+
 static aws::lambda_runtime::invocation_response my_handler(
     aws::lambda_runtime::invocation_request const& req, const SdkOptions& options) {
   Dispatcher dispatcher{mem_pool, options, MAX_CONCURRENT_DL};
   std::cout << "dispatcher.execute" << std::endl;
-  dispatcher.execute({S3Path{"bb-test-data-dev", "bid-large.parquet"}},
-                     Query{true,
-                           {MetricAggretation{AggType::SUM, "cpm"},
-                            MetricAggretation{AggType::SUM, "cpmUplift"}}});
+  Query query{};
+  query.compute_count = true;
+  query.metrics = {MetricAggregation{AggType::SUM, "cpm"},
+                   MetricAggregation{AggType::SUM, "cpmUplift"}};
+  query.time_filter = {START_TS, END_TS, "ingestionTime"};
+
+  auto result =
+      dispatcher.execute({S3Path{"bb-test-data-dev", "bid-large.parquet"}}, query);
+  if (!result.ok()) {
+    std::cout << "query exec error: " << result.message() << std::endl;
+  }
   return aws::lambda_runtime::invocation_response::success("Done", "text/plain");
 }
 

@@ -27,6 +27,7 @@
 #include <vector>
 
 #include "downloader.h"
+#include "kernels.h"
 #include "logger.h"
 #include "parquet-helper.h"
 #include "partial-file.h"
@@ -60,8 +61,22 @@ class Processor {
         read_column_chunck(chunck_file.file, file_metadata, col_plan->read_dict,
                            chunck_file.row_group, chunck_file.column));
     auto result_arrow = raw_arrow;
+    Buzz::IndexSets index_sets;
     if (col_plan->create_filter_index) {
-      // create filter index set
+      if (col_plan->filter_expression->ToString() == "StringFilter") {
+        auto expression =
+            std::dynamic_pointer_cast<StringExpression>(col_plan->filter_expression);
+        if (!expression) {
+          return Status::TypeError("Invalid cast");
+        }
+
+        ARROW_ASSIGN_OR_RAISE(index_sets,
+                              compute::index_of(raw_arrow, expression->candidates));
+
+        std::cout << "Nb index set chuncks: " << index_sets.sets_for_chuncks.size()
+                  << std::endl;
+      }
+      // WIP
     }
     if (col_plan->create_bitset) {
       if (col_plan->filter_expression->ToString() == "TimeFilter") {
@@ -75,7 +90,7 @@ class Processor {
         auto timestamp_type =
             std::dynamic_pointer_cast<arrow::TimestampType>(raw_arrow->type());
         if (!expression || !timestamp_type) {
-          return Status::ExpressionValidationError("Invalid cast");
+          return Status::TypeError("Invalid cast");
         }
 
         // create lower bound bitset
@@ -102,6 +117,8 @@ class Processor {
         result_arrow = start_and_end_result.chunked_array();
       }
       // TODO shortcut when all false
+    } else if (col_plan->filter_expression->ToString() == "StringFilter") {
+      // TODO genereate bitset
     }
 
     return PreprocCache::Column(result_arrow);
@@ -252,11 +269,11 @@ class Processor {
     } else if (timestamp_type->unit() == arrow::TimeUnit::NANO) {
       target_int = source * 1000000;
     } else {
-      return Status::ExpressionValidationError(
-          "Unexpected timestamp unit in arrow array, got " + timestamp_type->unit());
+      return Status::TypeError("Unexpected timestamp unit in arrow array, got " +
+                               timestamp_type->unit());
     }
     return std::make_shared<arrow::TimestampScalar>(target_int, timestamp_type);
   }
-};  // namespace Buzz
+};
 
 }  // namespace Buzz

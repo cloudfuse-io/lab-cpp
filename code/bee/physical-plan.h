@@ -37,6 +37,17 @@ struct TimeExpression : public FilterExpression {
   std::string ToString() const override { return "TimeFilter"; }
 };
 
+/// lower and upper are ms since epoch
+struct StringExpression : public FilterExpression {
+  std::vector<std::string> candidates;
+  bool is_exclude;
+
+  StringExpression(std::vector<std::string> values, bool exclude)
+      : candidates(std::move(values)), is_exclude(exclude) {}
+
+  std::string ToString() const override { return "StringFilter"; }
+};
+
 struct GroupByExpression {};
 
 /// Caracterize the pre-processing steps
@@ -79,8 +90,9 @@ class ColumnPhysicalPlans {
       // TODO check the exact rule for this
       if (!parquet_log_type->is_int() && !parquet_log_type->is_decimal() &&
           !parquet_log_type->is_none()) {
-        return Status::TypeError("Metric should by a Parquet numeric column, got ",
-                                 parquet_log_type->ToString());
+        return Status::ExpressionValidationError(
+            "Metric should by a Parquet numeric column, got ",
+            parquet_log_type->ToString());
       }
       plan_ptr->aggs.push_back(metric.agg_type);
       plan_ptr->read_dict = false;
@@ -97,14 +109,34 @@ class ColumnPhysicalPlans {
       auto parquet_log_type =
           file_metadata->schema()->Column(plan_ptr->col_id)->logical_type();
       if (!parquet_log_type->is_timestamp()) {
-        return Status::TypeError("Time filter should be a Parquet timestamp column, got ",
-                                 parquet_log_type->ToString());
+        return Status::ExpressionValidationError(
+            "Time filter should be a Parquet timestamp column, got ",
+            parquet_log_type->ToString());
       }
       plan_ptr->read_dict = false;
       plan_ptr->create_filter_index = false;
       plan_ptr->create_bitset = true;
       plan_ptr->filter_expression =
           std::make_shared<TimeExpression>(filter.start, filter.end);
+    }
+    for (auto& filter : query.tag_filters) {
+      auto plan_res = col_phys_plans.GetByName(filter.col_name);
+      if (!plan_res.ok()) {
+        plan_res = col_phys_plans.Insert(filter.col_name, file_metadata);
+      }
+      auto plan_ptr = plan_res.ValueOrDie();
+      auto parquet_log_type =
+          file_metadata->schema()->Column(plan_ptr->col_id)->logical_type();
+      if (!parquet_log_type->is_string()) {
+        return Status::ExpressionValidationError(
+            "Filter should be a Parquet string column, got ",
+            parquet_log_type->ToString());
+      }
+      plan_ptr->read_dict = true;
+      plan_ptr->create_filter_index = true;
+      plan_ptr->create_bitset = true;  // TODO false if group by
+      plan_ptr->filter_expression =
+          std::make_shared<StringExpression>(filter.values, filter.exclude);
     }
     return col_phys_plans;
   }

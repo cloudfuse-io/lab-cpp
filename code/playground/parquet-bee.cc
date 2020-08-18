@@ -54,6 +54,7 @@ static aws::lambda_runtime::invocation_response my_handler(
   query.metrics = {MetricAggregation{AggType::SUM, "cpm"},
                    MetricAggregation{AggType::SUM, "cpmUplift"}};
   query.time_filter = {START_TS, END_TS, "ingestionTime"};
+  query.tag_filters = {TagFilter{{"mobile"}, false, "device"}};
 
   auto result =
       dispatcher.execute({S3Path{"bb-test-data-dev", "bid-large.parquet"}}, query);

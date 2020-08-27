@@ -22,7 +22,7 @@
 #include <aws/core/utils/stream/PreallocatedStreamBuf.h>
 #include <aws/s3/model/DeleteObjectRequest.h>
 #include <aws/s3/model/GetObjectRequest.h>
-#include <result.h>
+#include <errors.h>
 #include <toolbox.h>
 
 #include <cassert>

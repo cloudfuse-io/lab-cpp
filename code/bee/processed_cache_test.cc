@@ -15,28 +15,31 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "stats.h"
+#include "processed_cache.h"
 
 #include <arrow/testing/gtest_util.h>
-#include <errors.h>
 #include <gtest/gtest.h>
 
 #include <cstdint>
 
 namespace Buzz {
 
-TEST(HashingTraits, Compare) {
-  HashingTraits<parquet::ByteArray>::Equal byte_array_comparator;
-  uint8_t lhs_array[3] = {1, 2, 3};
-  auto lhs_ba = parquet::ByteArray{3, lhs_array};
+TEST(MapFromView, SerializationPlayground) {
+  std::shared_ptr<arrow::Buffer> buf = arrow::AllocateBuffer(100).ValueOrDie();
+  auto data = buf->mutable_data();
+  int64_t timestamp = 191030654613;
+  memcpy(data, &timestamp, 8);
+  std::string tag = "hello";
+  int32_t length = tag.length();
+  memcpy(data + 8, &length, 4);
+  memcpy(data + 12, tag.data(), length);
 
-  uint8_t rhs_array_equal[3] = {1, 2, 3};
-  auto rhs_ba_equal = parquet::ByteArray{3, rhs_array_equal};
-  ASSERT_TRUE(byte_array_comparator(lhs_ba, rhs_ba_equal));
-
-  uint8_t rhs_array_ne[3] = {3, 2, 3};
-  auto rhs_ba_ne = parquet::ByteArray{3, rhs_array_ne};
-  ASSERT_FALSE(byte_array_comparator(lhs_ba, rhs_ba_ne));
+  arrow::internal::BinaryMemoTable<arrow::BinaryBuilder> group_by_key{
+      arrow::default_memory_pool(), 0};
+  int32_t memo_index;
+  auto status = group_by_key.GetOrInsert(data, 12 + length, &memo_index);
+  ASSERT_TRUE(status.ok());
+  ASSERT_EQ(memo_index, 0);
 }
 
 }  // namespace Buzz

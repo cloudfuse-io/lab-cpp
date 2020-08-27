@@ -18,7 +18,7 @@
 #pragma once
 
 #include <arrow/api.h>
-#include <result.h>
+#include <errors.h>
 
 #include <string>
 

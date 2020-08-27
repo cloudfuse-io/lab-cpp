@@ -18,7 +18,7 @@
 #pragma once
 
 #include <arrow/io/interfaces.h>
-#include <result.h>
+#include <errors.h>
 
 namespace Buzz {
 

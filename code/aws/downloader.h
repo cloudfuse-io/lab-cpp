@@ -19,13 +19,14 @@
 
 #include <arrow/buffer.h>
 #include <aws/s3/S3Client.h>
-#include <result.h>
+#include <errors.h>
 
 #include <condition_variable>
 #include <string>
 #include <vector>
 
 #include "async_queue.h"
+#include "file_location.h"
 #include "metrics.h"
 #include "sdk-init.h"
 
@@ -36,11 +37,18 @@ namespace Buzz {
 const Status STATUS_ABORTED(StatusCode::UnknownError, "query_aborted");
 #endif
 
-struct S3Path {
+struct S3Path : public FileLocation {
+  std::string ToString() const override {
+    std::stringstream s;
+    s << "s3://";
+    s << bucket;
+    s << "/";
+    s << key;
+    return s.str();
+  }
+
   std::string bucket;
   std::string key;
-
-  std::string ToString() const { return bucket + "/" + key; }
 };
 
 /// if range_start==range_end==0 this is an init request

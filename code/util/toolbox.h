@@ -72,6 +72,23 @@ inline char random_alphanum() {
   return charset[time::now().time_since_epoch().count() % max_index];
 }
 
+/// boost::combine_hash
+inline size_t combine_hash(size_t lhs, size_t rhs) {
+  lhs ^= rhs + 0x9e3779b9 + (lhs << 6) + (lhs >> 2);
+  return lhs;
+}
+
+// template <typename T>
+// struct VectorHasher {
+//   int operator()(const std::vector<T>& vect) const {
+//     size_t hash = vect.size();
+//     for (auto& i : vect) {
+//       hash = combine_hash(hash, std::hash(i));
+//     }
+//     return hash;
+//   }
+// };
+
 }  // namespace util
 
 }  // namespace Buzz

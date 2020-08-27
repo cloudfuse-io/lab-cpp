@@ -17,8 +17,8 @@
 
 #pragma once
 
+#include <errors.h>
 #include <parquet/api/schema.h>
-#include <result.h>
 
 #include <string_view>
 #include <unordered_map>

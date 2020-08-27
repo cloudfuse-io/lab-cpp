@@ -30,7 +30,6 @@
 #include "parquet-helper.h"
 #include "partial-file.h"
 #include "sdk-init.h"
-#include "stats.h"
 #include "toolbox.h"
 
 using namespace Buzz;

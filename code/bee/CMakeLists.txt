@@ -7,7 +7,8 @@ target_link_libraries(buzz-bee PRIVATE buzz-util)
 list(APPEND BUZZ_ALL buzz-bee)
 
 if("${BUZZ_BUILD_TESTS}" STREQUAL "ON")
-  package_add_test(NAME stats_test SRCS stats_test.cc DEPS buzz-util)
+  package_add_test(NAME stats_test SRCS stats_test.cc DEPS buzz-bee buzz-util)
+  package_add_test(NAME processed_cache_test SRCS processed_cache_test.cc DEPS buzz-bee buzz-util)
 endif()
 
 

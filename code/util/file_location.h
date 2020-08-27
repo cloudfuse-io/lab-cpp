@@ -15,28 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "stats.h"
+#pragma once
 
-#include <arrow/testing/gtest_util.h>
-#include <errors.h>
-#include <gtest/gtest.h>
-
-#include <cstdint>
+#include <string>
 
 namespace Buzz {
-
-TEST(HashingTraits, Compare) {
-  HashingTraits<parquet::ByteArray>::Equal byte_array_comparator;
-  uint8_t lhs_array[3] = {1, 2, 3};
-  auto lhs_ba = parquet::ByteArray{3, lhs_array};
-
-  uint8_t rhs_array_equal[3] = {1, 2, 3};
-  auto rhs_ba_equal = parquet::ByteArray{3, rhs_array_equal};
-  ASSERT_TRUE(byte_array_comparator(lhs_ba, rhs_ba_equal));
-
-  uint8_t rhs_array_ne[3] = {3, 2, 3};
-  auto rhs_ba_ne = parquet::ByteArray{3, rhs_array_ne};
-  ASSERT_FALSE(byte_array_comparator(lhs_ba, rhs_ba_ne));
-}
-
+class FileLocation {
+ public:
+  virtual std::string ToString() const = 0;
+};
 }  // namespace Buzz

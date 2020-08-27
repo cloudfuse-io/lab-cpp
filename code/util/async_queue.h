@@ -23,7 +23,7 @@
 #include <queue>
 #include <thread>
 
-#include "result.h"
+#include "errors.h"
 
 namespace Buzz {
 

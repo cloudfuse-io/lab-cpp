@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "partial-file.h"
+#include "partial_file.h"
 
 #include <arrow/buffer.h>
 #include <arrow/util/future.h>

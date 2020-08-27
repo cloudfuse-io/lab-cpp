@@ -23,7 +23,7 @@
 #include <iostream>
 
 #include "downloader.h"
-#include "partial-file.h"
+#include "partial_file.h"
 
 namespace Buzz {
 
@@ -85,17 +85,10 @@ class ParquetHelper {
     rg_start_map.emplace(request, ColumnChunckIds{row_group, column});
   }
 
-  struct ChunckFile {
-    S3Path path;
-    int row_group;
-    int column;
-    std::shared_ptr<PartialFile> file;
-  };
-
   /// Get results from the downloader and attach them back their Parquet properties
-  std::vector<ChunckFile> GetChunckFiles() {
+  std::vector<ParquetPartialFileWrap> GetChunckFiles() {
     auto results = downloader_->ProcessResponses();
-    std::vector<ChunckFile> parquet_chunck_files;
+    std::vector<ParquetPartialFileWrap> parquet_chunck_files;
     for (auto& result : results) {
       if (result.status().message() == STATUS_ABORTED.message()) {
         continue;
@@ -111,7 +104,8 @@ class ParquetHelper {
         std::vector<FileChunck> footer_chuncks{{footer_start_pos, response.raw_data}};
         auto foot_file =
             std::make_shared<PartialFile>(footer_chuncks, response.file_size);
-        parquet_chunck_files.push_back({response.request.path, -1, -1, foot_file});
+        parquet_chunck_files.push_back(
+            {std::make_shared<S3Path>(response.request.path), foot_file});
       } else {
         // create chunck file with range for specific col chunck
         std::vector<FileChunck> rg_chuncks{
@@ -119,8 +113,9 @@ class ParquetHelper {
         auto chunck_ids = rg_start_map[response.request];
         auto col_chunk_file =
             std::make_shared<PartialFile>(rg_chuncks, response.file_size);
-        parquet_chunck_files.push_back({response.request.path, chunck_ids.row_group,
-                                        chunck_ids.column, col_chunk_file});
+        parquet_chunck_files.push_back({std::make_shared<S3Path>(response.request.path),
+                                        chunck_ids.row_group, chunck_ids.column,
+                                        col_chunk_file});
       }
     }
     return parquet_chunck_files;

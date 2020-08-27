@@ -33,11 +33,17 @@ class RowGroupContainer {
         row_group_id_(row_group_id) {}
 
  public:
+  /// Sorts the processed column according to the row group plan
+  /// If the processed column is an all false filter, set skip to true
   void Add(ProcessedColumn processed_col);
+
+  /// All the column for the row group plan were added
   bool Ready();
+
   bool is_skipped() { return skip; }
-  void set_skipped() { skip = true; }
-  RowGroupResult Execute();
+
+  /// Once the container is ready, compute query on the row group
+  Result<std::shared_ptr<RowGroupResult>> Execute();
 
  private:
   std::shared_ptr<RowGroupPhysicalPlan> row_group_plan_;
@@ -49,6 +55,19 @@ class RowGroupContainer {
   std::shared_ptr<FilterColumn> filter_column;
   std::vector<GroupByColumn> group_by_columns;
   std::vector<MetricColumn> metric_columns;
+};
+
+class QueryRowGroupContainers {
+ public:
+  std::shared_ptr<RowGroupContainer> CreateAndAdd(
+      std::shared_ptr<FileLocation> file_location,
+      std::shared_ptr<RowGroupPhysicalPlan> row_group_plan, int row_group_id);
+
+  Result<std::shared_ptr<RowGroupContainer>> Get(
+      std::shared_ptr<FileLocation> file_location, int row_group_id);
+
+ private:
+  std::vector<RowGroupContainer> containers_;
 };
 
 }  // namespace Buzz

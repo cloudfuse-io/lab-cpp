@@ -29,8 +29,8 @@
 // #include "downloader.h"
 // #include "kernels.h"
 // #include "logger.h"
-// #include "parquet-helper.h"
-// #include "partial-file.h"
+// #include "parquet_helper.h"
+// #include "partial_file.h"
 // #include "physical-plan.h"
 // #include "preproc-cache.h"
 

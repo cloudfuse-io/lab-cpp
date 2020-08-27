@@ -19,6 +19,7 @@
 
 #include <arrow/io/interfaces.h>
 #include <errors.h>
+#include <file_location.h>
 
 namespace Buzz {
 
@@ -51,6 +52,40 @@ class PartialFile : public arrow::io::RandomAccessFile {
   std::vector<FileChunck> chuncks_;
   int64_t size_;
   int64_t position_;
+};
+
+/// A wrapper around a partial file containing info about
+/// - file location
+/// - chunck row group and column
+class ParquetPartialFileWrap {
+ public:
+  /// create footer chunck
+  ParquetPartialFileWrap(std::shared_ptr<FileLocation> location,
+                         std::shared_ptr<PartialFile> file)
+      : location_(location), row_group_(-1), column_(-1), file_(file) {}
+
+  /// create row group chunck
+  ParquetPartialFileWrap(std::shared_ptr<FileLocation> location, int row_group,
+                         int column, std::shared_ptr<PartialFile> file)
+      : location_(location), row_group_(row_group), column_(column), file_(file) {}
+
+  bool is_footer() { return row_group_ == -1 && column_ == -1; }
+
+  std::shared_ptr<FileLocation> location() { return location_; }
+
+  /// returns -1 if this is a footer
+  int row_group() { return row_group_; }
+
+  /// returns -1 if this is a footer
+  int column() { return column_; }
+
+  std::shared_ptr<PartialFile> file() { return file_; }
+
+ private:
+  std::shared_ptr<FileLocation> location_;
+  int row_group_;
+  int column_;
+  std::shared_ptr<PartialFile> file_;
 };
 
 }  // namespace Buzz

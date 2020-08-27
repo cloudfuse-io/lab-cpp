@@ -27,8 +27,8 @@
 #include "cust_memory_pool.h"
 #include "downloader.h"
 #include "logger.h"
-#include "parquet-helper.h"
-#include "partial-file.h"
+#include "parquet_helper.h"
+#include "partial_file.h"
 #include "sdk-init.h"
 #include "toolbox.h"
 

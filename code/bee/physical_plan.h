@@ -20,7 +20,7 @@
 #include <errors.h>
 #include <file_location.h>
 #include <parquet/metadata.h>
-#include <partial-file.h>
+#include <partial_file.h>
 #include <processed_column.h>
 #include <query.h>
 
@@ -79,8 +79,13 @@ class ColumnPhysicalPlan {
       std::shared_ptr<parquet::FileMetaData> metadata, const Query& query,
       std::string column_name);
 
+  /// Try to get the ProcessedColumn from metadata only
+  /// For strings only min/max can be used (dict not available in footer)
   std::optional<ProcessedColumn> PreExecute(int row_group_id);
-  Result<ProcessedColumn> Execute(PartialFile file, int row_group_id);
+
+  Result<ProcessedColumn> Execute(std::shared_ptr<PartialFile> file, int row_group_id);
+
+  int column_id() { return column_id_; }
 
  private:
   int column_id_;
@@ -99,9 +104,30 @@ class FilePhysicalPlan {
       std::shared_ptr<FileLocation> file_location_,
       std::shared_ptr<parquet::FileMetaData> metadata, const Query& query);
 
+  int RowGroupCount();
+  std::vector<std::shared_ptr<ColumnPhysicalPlan>> ColumnPlans();
+  Result<std::shared_ptr<ColumnPhysicalPlan>> ColumnPlan(int col_id);
+  std::shared_ptr<RowGroupPhysicalPlan> RowGroupPlan();
+  std::shared_ptr<parquet::FileMetaData> metadata() { return metadata_; }
+
  private:
+  std::shared_ptr<parquet::FileMetaData> metadata_;
   std::shared_ptr<RowGroupPhysicalPlan> row_group_plan_;
-  std::unordered_map<int, ColumnPhysicalPlan> col_plans_;
+  std::unordered_map<int, std::shared_ptr<ColumnPhysicalPlan>> col_plans_;
+};
+
+/////////////////////////
+
+class QueryPhysicalPlans {
+ public:
+  Result<std::shared_ptr<FilePhysicalPlan>> CreateAndAdd(
+      ParquetPartialFileWrap footer_file, const Query& query);
+
+  Result<std::shared_ptr<ColumnPhysicalPlan>> ColumnPlan(
+      std::shared_ptr<FileLocation> location, int col_id);
+
+ private:
+  std::unordered_map<std::string, std::shared_ptr<FilePhysicalPlan>> file_plans_;
 };
 
 }  // namespace Buzz

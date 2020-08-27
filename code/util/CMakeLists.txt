@@ -1,7 +1,7 @@
 add_library (buzz-util STATIC
   cust_memory_pool.cc
   async_queue.cc
-  partial-file.cc
+  partial_file.cc
   metrics.cc
   logger.cc)
 target_include_directories(buzz-util PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
@@ -11,7 +11,7 @@ list(APPEND BUZZ_ALL buzz-util)
 if("${BUZZ_BUILD_TESTS}" STREQUAL "ON")
   package_add_test(NAME cust_memory_pool_test SRCS cust_memory_pool_test.cc DEPS buzz-util)
   package_add_test(NAME async_queue_test SRCS async_queue_test.cc DEPS buzz-util)
-  package_add_test(NAME partial-file_test SRCS partial-file_test.cc DEPS buzz-util)
+  package_add_test(NAME partial_file_test SRCS partial_file_test.cc DEPS buzz-util)
   package_add_test(NAME toolbox_test SRCS toolbox_test.cc DEPS buzz-util)
 endif()
 

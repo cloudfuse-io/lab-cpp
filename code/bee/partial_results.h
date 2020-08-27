@@ -50,22 +50,22 @@ class RowGroupResult {
   std::vector<arrow::ArrayBuilder> metric_data;  // NumericBuilders
 };
 
+class BeeResult {
+ private:
+  arrow::BinaryArray group_by_keys;
+  std::vector<arrow::Array> metrics;
+};
+
 class BeeResultBuilder {
  public:
   BeeResultBuilder(arrow::MemoryPool* mem_pool) : group_by_key{mem_pool, 0} {}
-  void Collect(RowGroupResult processed_row_group);
+  void Collect(std::shared_ptr<RowGroupResult> row_group_result);
   BeeResult Finalize();
 
  private:
   std::vector<arrow::Scalar> total_aggs;  // NumericScalars
   arrow::internal::BinaryMemoTable<arrow::BinaryBuilder> group_by_key;
   std::vector<arrow::ArrayBuilder> metric_data;  // NumericBuilders
-};
-
-class BeeResult {
- private:
-  arrow::BinaryArray group_by_keys;
-  std::vector<arrow::Array> metrics;
 };
 
 }  // namespace Buzz

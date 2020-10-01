@@ -55,6 +55,7 @@ Result<int64_t> read_column_chunck(std::shared_ptr<::arrow::io::RandomAccessFile
 
   std::shared_ptr<arrow::ChunkedArray> array;
   PARQUET_THROW_NOT_OK(reader->RowGroup(rg)->Column(COLUMN_ID)->Read(&array));
+  // std::cout << "nb chuncks:" << array->chunks().size() << std::endl;
   return array->length();
 }
 
@@ -97,8 +98,8 @@ static aws::lambda_runtime::invocation_response my_handler(
       metrics_manager->EnterPhase("proc");
       metrics_manager->NewEvent("starting_proc");
       // read chunck
-      rows_read += read_column_chunck(col_chunck_file.file, file_metadata,
-                                      col_chunck_file.row_group)
+      rows_read += read_column_chunck(col_chunck_file.file(), file_metadata,
+                                      col_chunck_file.row_group())
                        .ValueOrDie();
       downloaded_chuncks++;
       metrics_manager->ExitPhase("proc");

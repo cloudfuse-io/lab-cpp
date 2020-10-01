@@ -38,6 +38,10 @@ const Status STATUS_ABORTED(StatusCode::UnknownError, "query_aborted");
 #endif
 
 struct S3Path : public FileLocation {
+  S3Path() {}
+  S3Path(std::string bucket_name, std::string key_name)
+      : bucket(std::move(bucket_name)), key(std::move(key_name)) {}
+
   std::string ToString() const override {
     std::stringstream s;
     s << "s3://";

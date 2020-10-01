@@ -21,6 +21,7 @@
 #include <file_location.h>
 #include <parquet/metadata.h>
 #include <partial_file.h>
+#include <partial_results.h>
 #include <processed_column.h>
 #include <query.h>
 
@@ -29,21 +30,11 @@
 
 namespace Buzz {
 
-class RowGroupPhysicalPlan {
- public:
-  static Result<std::shared_ptr<RowGroupPhysicalPlan>> Make(
-      std::shared_ptr<FileLocation> file_location_,
-      std::shared_ptr<parquet::FileMetaData> metadata, const Query& query);
+// TODO destructors to avoid leak because of circular refs
 
- private:
-  std::shared_ptr<FileLocation> file_location_;
-  std::unordered_set<int> columns_;
-  std::vector<int> group_bys_;
-  std::vector<int> metrics_;
-  std::unordered_set<int> filters_;
-};
-
-///////////////////////////
+class RowGroupPhysicalPlan;
+class FilePhysicalPlan;
+class QueryPhysicalPlans;
 
 class FilterPlan {
  public:
@@ -76,14 +67,14 @@ class TimestampFilterPlan : public FilterPlan {
 class ColumnPhysicalPlan {
  public:
   static Result<std::shared_ptr<ColumnPhysicalPlan>> Make(
-      std::shared_ptr<parquet::FileMetaData> metadata, const Query& query,
-      std::string column_name);
+      std::shared_ptr<RowGroupPhysicalPlan>, int col_id);
 
   /// Try to get the ProcessedColumn from metadata only
   /// For strings only min/max can be used (dict not available in footer)
-  std::optional<ProcessedColumn> PreExecute(int row_group_id);
+  /// Can be done on creation
+  // PreExecute();
 
-  Result<ProcessedColumn> Execute(std::shared_ptr<PartialFile> file, int row_group_id);
+  Status Execute(std::shared_ptr<PartialFile> file);
 
   int column_id() { return column_id_; }
 
@@ -92,8 +83,35 @@ class ColumnPhysicalPlan {
   std::string column_name_;
   bool read_dict_;
   bool create_bitset_;
-  std::shared_ptr<FilterPlan> filter_plan;
+  std::shared_ptr<FilterPlan> filter_plan_;
+  // TODO bucket_plan_ ?
+  std::shared_ptr<RowGroupPhysicalPlan> rg_phys_plan_;
   // - expected_type (arrow)
+};
+
+///////////////////////////
+
+class RowGroupPhysicalPlan {
+ public:
+  static Result<std::shared_ptr<RowGroupPhysicalPlan>> Make(
+      std::shared_ptr<FilePhysicalPlan> file_phys_plan, int rg_id);
+
+  /// All the column for the row group plan were added
+  bool Ready();
+
+  bool Skipped();
+
+ private:
+  std::shared_ptr<FilePhysicalPlan> file_phys_plan__;
+
+  std::vector<std::shared_ptr<ColumnPhysicalPlan>> col_phys_plans_;
+
+  int row_group_id_;
+
+  // std::unordered_set<int> columns_;
+  // std::vector<int> group_bys_;
+  // std::vector<int> metrics_;
+  // std::unordered_set<int> filters_;
 };
 
 ///////////////////////////
@@ -101,33 +119,51 @@ class ColumnPhysicalPlan {
 class FilePhysicalPlan {
  public:
   static Result<std::shared_ptr<FilePhysicalPlan>> Make(
-      std::shared_ptr<FileLocation> file_location_,
-      std::shared_ptr<parquet::FileMetaData> metadata, const Query& query);
+      std::shared_ptr<QueryPhysicalPlans> query_phys_plan,
+      ParquetPartialFileWrap footer_file);
 
-  int RowGroupCount();
-  std::vector<std::shared_ptr<ColumnPhysicalPlan>> ColumnPlans();
-  Result<std::shared_ptr<ColumnPhysicalPlan>> ColumnPlan(int col_id);
-  std::shared_ptr<RowGroupPhysicalPlan> RowGroupPlan();
+  // std::vector<std::shared_ptr<ColumnPhysicalPlan>> ColumnPlans(int rg_id);
+  Result<std::shared_ptr<ColumnPhysicalPlan>> GetColumnPlan(int rg_id, int col_id);
+  // std::shared_ptr<RowGroupPhysicalPlan> RowGroupPlan(int rg_id);
   std::shared_ptr<parquet::FileMetaData> metadata() { return metadata_; }
+  std::shared_ptr<FileLocation> location() { return file_location_; }
 
  private:
   std::shared_ptr<parquet::FileMetaData> metadata_;
-  std::shared_ptr<RowGroupPhysicalPlan> row_group_plan_;
-  std::unordered_map<int, std::shared_ptr<ColumnPhysicalPlan>> col_plans_;
+  std::shared_ptr<FileLocation> file_location_;
+  std::vector<std::shared_ptr<RowGroupPhysicalPlan>> row_group_plans_;
 };
 
 /////////////////////////
 
+struct ChunckToDownload {
+  std::shared_ptr<FileLocation> file_location;
+  int64_t chunck_start;
+  int64_t chunck_end;
+  int row_group_id;
+  int column_id;
+};
+
 class QueryPhysicalPlans {
  public:
-  Result<std::shared_ptr<FilePhysicalPlan>> CreateAndAdd(
-      ParquetPartialFileWrap footer_file, const Query& query);
+  QueryPhysicalPlans(std::shared_ptr<Query> query) : query_(query) {}
 
-  Result<std::shared_ptr<ColumnPhysicalPlan>> ColumnPlan(
-      std::shared_ptr<FileLocation> location, int col_id);
+  /// Create a plan for the file from the footer passed as param
+  Result<std::vector<ChunckToDownload>> NewFilePlan(ParquetPartialFileWrap footer_file);
+
+  // Result<std::shared_ptr<ColumnPhysicalPlan>> GetColumnPlan(
+  //     std::shared_ptr<FileLocation> location, int rg_id, int col_id);
+
+  /// Find the right plan for the file col chunck and execute it
+  Status ProcessColumnChunck(ParquetPartialFileWrap col_chunck_file);
+
+  /// Process the next row group that is ready
+  /// Return null if no row group is complete and ready to process
+  Result<std::shared_ptr<RowGroupResult>> ProcessNextRowGroup();
 
  private:
-  std::unordered_map<std::string, std::shared_ptr<FilePhysicalPlan>> file_plans_;
+  std::vector<std::shared_ptr<FilePhysicalPlan>> file_plans_;
+  std::shared_ptr<Query> query_;
 };
 
 }  // namespace Buzz

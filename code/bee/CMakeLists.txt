@@ -1,5 +1,6 @@
 add_library (buzz-bee STATIC
-  dispatcher.cc
+  # dispatcher.cc
+  physical_plan.cc
   stats.cc)
 target_include_directories(buzz-bee PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_arrow(buzz-bee)

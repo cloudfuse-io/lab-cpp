@@ -41,6 +41,6 @@ class Dispatcher {
   std::shared_ptr<Synchronizer> synchronizer_;
   std::shared_ptr<MetricsManager> metrics_manager_;
   std::unique_ptr<ParquetHelper> parquet_helper_;
-};  // namespace Buzz
+};
 
 }  // namespace Buzz

@@ -38,7 +38,7 @@ services:
       backend:
 
   lambda-runtime:
-    image: buzz-lambda-runtime-cpp
+    image: cloudfuse-lab-lambda-runtime-cpp
     volumes:
       - ~/.aws:/root/.aws
     cpus: 1

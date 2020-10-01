@@ -7,9 +7,9 @@ RUN yum update  -y && \
 ARG BUILD_FILE
 ARG BUILD_TYPE=static
 
-COPY buzz-${BUILD_FILE}-${BUILD_TYPE}.zip .
+COPY cloudfuse-lab-${BUILD_FILE}-${BUILD_TYPE}.zip .
 
-RUN unzip buzz-${BUILD_FILE}-${BUILD_TYPE}.zip &&\
-  mv bin/buzz-${BUILD_FILE}-${BUILD_TYPE} bin/exec
+RUN unzip cloudfuse-lab-${BUILD_FILE}-${BUILD_TYPE}.zip &&\
+  mv bin/cloudfuse-lab-${BUILD_FILE}-${BUILD_TYPE} bin/exec
 
 ENTRYPOINT bin/exec N/A

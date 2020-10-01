@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.17)
-project(buzz-cpp VERSION 0.1)
+project(cloudfuse-lab-cpp VERSION 0.1)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/executables)
 
@@ -37,7 +37,7 @@ add_subdirectory(aws)
 # we build exec files 1 by 1, acording to the BUZZ_BUILD_FILE var
 set(HIVE_FILES flight-server query-bw-scheduler)
 if("${BUZZ_BUILD_FILE}" IN_LIST HIVE_FILES)
-  set(BUZZ_TARGET "buzz-${BUZZ_BUILD_FILE}-${BUZZ_BUILD_TYPE}")
+  set(BUZZ_TARGET "cloudfuse-lab-${BUZZ_BUILD_FILE}-${BUZZ_BUILD_TYPE}")
 
   MESSAGE(STATUS "Hive packaging ${BUZZ_BUILD_FILE}.cc as ${BUZZ_TARGET}")
 
@@ -45,12 +45,12 @@ if("${BUZZ_BUILD_FILE}" IN_LIST HIVE_FILES)
   list(APPEND BUZZ_ALL ${BUZZ_TARGET})
 
   target_link_libraries(${BUZZ_TARGET}
-    PRIVATE buzz-aws buzz-util
+    PRIVATE cloudfuse-lab-aws cloudfuse-lab-util
   )
   target_link_arrow(${BUZZ_TARGET})
 elseif(BUZZ_BUILD_FILE)
   find_package(aws-lambda-runtime)
-  set(BUZZ_TARGET "buzz-${BUZZ_BUILD_FILE}-${BUZZ_BUILD_TYPE}")
+  set(BUZZ_TARGET "cloudfuse-lab-${BUZZ_BUILD_FILE}-${BUZZ_BUILD_TYPE}")
 
   MESSAGE(STATUS "Bee packaging ${BUZZ_BUILD_FILE}.cc as ${BUZZ_TARGET}")
 
@@ -58,7 +58,7 @@ elseif(BUZZ_BUILD_FILE)
   list(APPEND BUZZ_ALL ${BUZZ_TARGET})
 
   target_link_libraries(${BUZZ_TARGET}
-    PRIVATE AWS::aws-lambda-runtime buzz-aws buzz-util
+    PRIVATE AWS::aws-lambda-runtime cloudfuse-lab-aws cloudfuse-lab-util
   )
   target_link_arrow(${BUZZ_TARGET})
 else()

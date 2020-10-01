@@ -14,7 +14,7 @@ resource "null_resource" "query-bw-scheduler-push" {
 
   provisioner "local-exec" {
     command = <<EOT
-      docker tag "buzz-hive-query-bw-scheduler:${var.git_revision}" "${aws_ecr_repository.query-bw-scheduler-repo.repository_url}:${var.git_revision}"
+      docker tag "cloudfuse-lab-hive-query-bw-scheduler:${var.git_revision}" "${aws_ecr_repository.query-bw-scheduler-repo.repository_url}:${var.git_revision}"
       docker push "${aws_ecr_repository.query-bw-scheduler-repo.repository_url}:${var.git_revision}"
     EOT
   }
@@ -50,7 +50,7 @@ module "query-bandwidth-bee" {
   source = "./lambda"
 
   function_base_name = "query-bandwidth-static-bee"
-  filename           = "${local.lambda_build_dir}/buzz-query-bandwidth-static.zip"
+  filename           = "${local.lambda_build_dir}/cloudfuse-lab-query-bandwidth-static.zip"
   handler            = "N/A"
   memory_size        = 2048
   timeout            = 10

@@ -2,7 +2,7 @@ version: '2.4'
 
 services:
   lambda-runtime:
-    image: buzz-lambda-runtime-cpp
+    image: cloudfuse-lab-lambda-runtime-cpp
     volumes:
       - ~/.aws:/root/.aws
     cpus: 1

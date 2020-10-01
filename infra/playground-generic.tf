@@ -90,7 +90,7 @@ module "generic-playground-lambda" {
   source = "./lambda"
 
   function_base_name = "generic-playground-static"
-  filename           = "${local.lambda_build_dir}/buzz-${var.generic_playground_file}-static.zip"
+  filename           = "${local.lambda_build_dir}/cloudfuse-lab-${var.generic_playground_file}-static.zip"
   handler            = "N/A"
   memory_size        = local.playground[var.generic_playground_file].memory_size
   timeout            = 10

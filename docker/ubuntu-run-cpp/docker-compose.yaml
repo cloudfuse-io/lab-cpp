@@ -2,7 +2,7 @@ version: '2.4'
 
 services:
   server-runtime:
-    image: "buzz-hive-${BUILD_FILE}:${IMAGE_TAG}"
+    image: "cloudfuse-lab-hive-${BUILD_FILE}:${IMAGE_TAG}"
     build:
       context: ../../bin/build-ubuntu/executables
       dockerfile: ../../../docker/ubuntu-run-cpp/Dockerfile

@@ -1,6 +1,6 @@
 FROM cloudfuse/ubuntu-builder:gcc75
 
-COPY --from=buzz-aws-sdk-cpp-ubuntu /install /install
+COPY --from=cloudfuse-lab-aws-sdk-cpp-ubuntu /install /install
 
 COPY code /source
 

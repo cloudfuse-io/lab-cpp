@@ -28,7 +28,7 @@ if [ "$1" = 'build' ]; then
   make
 elif [ "$1" = 'package' ]; then
   cd /build
-  /packager -d /build/executables/buzz-${BUILD_FILE}-${BUILD_TYPE}
+  /packager -d /build/executables/cloudfuse-lab-${BUILD_FILE}-${BUILD_TYPE}
 elif [ "$1" = 'test' ]; then
   cd /build
   cmake /source -DCMAKE_BUILD_TYPE=Release \

@@ -1,20 +1,20 @@
-add_library(buzz-aws STATIC
+add_library(cloudfuse-lab-aws STATIC
   sdk-init.cc
   downloader.cc
   curl/HttpClientFactory.cpp
   curl/HttpClient.cpp
   curl/HandleContainer.cpp)
-target_include_directories(buzz-aws PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_arrow(buzz-aws)
-target_link_libraries(buzz-aws PRIVATE buzz-util)
+target_include_directories(cloudfuse-lab-aws PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_arrow(cloudfuse-lab-aws)
+target_link_libraries(cloudfuse-lab-aws PRIVATE cloudfuse-lab-util)
 
 find_package(AWSSDK COMPONENTS config s3 transfer lambda)
-target_link_libraries(buzz-aws PRIVATE ${AWSSDK_LINK_LIBRARIES})
+target_link_libraries(cloudfuse-lab-aws PRIVATE ${AWSSDK_LINK_LIBRARIES})
 
-list(APPEND BUZZ_ALL buzz-aws)
+list(APPEND BUZZ_ALL cloudfuse-lab-aws)
 
 if("${BUZZ_BUILD_TESTS}" STREQUAL "ON")
-  package_add_test(NAME downloader_test SRCS downloader_test.cc DEPS buzz-aws buzz-util)
+  package_add_test(NAME downloader_test SRCS downloader_test.cc DEPS cloudfuse-lab-aws cloudfuse-lab-util)
 endif()
 
 

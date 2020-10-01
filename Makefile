@@ -26,60 +26,60 @@ docker-login:
 ## build commands
 build-lambda-runtime-cpp:
 	cd docker/lambda-runtime-cpp && \
-	docker build -t buzz-lambda-runtime-cpp .
+	docker build -t cloudfuse-lab-lambda-runtime-cpp .
 
 arrow-cpp-hive-build-image: bin-folder
 	cd docker/aws-sdk-cpp && \
 	docker build \
-		-t buzz-aws-sdk-cpp-ubuntu \
+		-t cloudfuse-lab-aws-sdk-cpp-ubuntu \
 		--build-arg PLATFORM=cloudfuse/ubuntu-builder:gcc75 \
 		.
 	git submodule update --init
-	docker build -f docker/arrow-cpp/hive.Dockerfile -t buzz-arrow-cpp-build-hive .
-	# docker run -it buzz-arrow-cpp-build-hive sh
+	docker build -f docker/arrow-cpp/hive.Dockerfile -t cloudfuse-lab-arrow-cpp-build-hive .
+	# docker run -it cloudfuse-lab-arrow-cpp-build-hive sh
 
 arrow-cpp-bee-build-image: bin-folder build-lambda-runtime-cpp
 	cd docker/aws-sdk-cpp && \
 	docker build \
-		-t buzz-aws-sdk-cpp-amznlinux1 \
+		-t cloudfuse-lab-aws-sdk-cpp-amznlinux1 \
 		--build-arg PLATFORM=cloudfuse/amazonlinux1-builder:gcc72 \
 		.
 	git submodule update --init
-	docker build -f docker/arrow-cpp/bee.Dockerfile -t buzz-arrow-cpp-build-bee .
-	# docker run -it buzz-arrow-cpp-build-bee bash
+	docker build -f docker/arrow-cpp/bee.Dockerfile -t cloudfuse-lab-arrow-cpp-build-bee .
+	# docker run -it cloudfuse-lab-arrow-cpp-build-bee bash
 
 # arrow-cpp-bench-image: bin-folder
-# 	docker build -t buzz-arrow-cpp-bench -f docker/arrow-cpp/benchmarks.Dockerfile .
-# 	docker run --rm -it -v ${CURDIR}/bin/build-bench:/tmp/ buzz-arrow-cpp-bench
+# 	docker build -t cloudfuse-lab-arrow-cpp-bench -f docker/arrow-cpp/benchmarks.Dockerfile .
+# 	docker run --rm -it -v ${CURDIR}/bin/build-bench:/tmp/ cloudfuse-lab-arrow-cpp-bench
 
-bin/build-amznlinux1/executables/buzz-%-static: arrow-cpp-bee-build-image
+bin/build-amznlinux1/executables/cloudfuse-lab-%-static: arrow-cpp-bee-build-image
 	docker run --rm \
 		-v ${CURDIR}/bin/build-amznlinux1:/build \
 		-e BUILD_FILE=$* \
 		-e BUILD_TYPE=static \
-		buzz-arrow-cpp-build-bee \
+		cloudfuse-lab-arrow-cpp-build-bee \
 		build
 
-bin/build-amznlinux1/executables/buzz-%-static.zip: bin/build-amznlinux1/executables/buzz-%-static
+bin/build-amznlinux1/executables/cloudfuse-lab-%-static.zip: bin/build-amznlinux1/executables/cloudfuse-lab-%-static
 	docker run --rm \
 		-v ${CURDIR}/bin/build-amznlinux1/executables:/build/executables \
 		-e BUILD_FILE=$* \
 		-e BUILD_TYPE=static \
-		buzz-arrow-cpp-build-bee \
+		cloudfuse-lab-arrow-cpp-build-bee \
 		package
 
 build-bee:
-	make bin/build-amznlinux1/executables/buzz-${BUILD_FILE}-static
+	make bin/build-amznlinux1/executables/cloudfuse-lab-${BUILD_FILE}-static
 
 package-bee:
-	make bin/build-amznlinux1/executables/buzz-${BUILD_FILE}-static.zip
+	make bin/build-amznlinux1/executables/cloudfuse-lab-${BUILD_FILE}-static.zip
 
 build-hive: arrow-cpp-hive-build-image
 	docker run --rm \
 		-v ${CURDIR}/bin/build-ubuntu:/build \
 		-e BUILD_FILE=${BUILD_FILE} \
 		-e BUILD_TYPE=static \
-		buzz-arrow-cpp-build-hive \
+		cloudfuse-lab-arrow-cpp-build-hive \
 		build
 
 test: arrow-cpp-bee-build-image
@@ -87,7 +87,7 @@ test: arrow-cpp-bee-build-image
 		-v ${CURDIR}/bin/build-tests:/build \
 		-e BUILD_FILE=${BUILD_FILE} \
 		-e BUILD_TYPE=static \
-		buzz-arrow-cpp-build-bee \
+		cloudfuse-lab-arrow-cpp-build-bee \
 		test
 
 ## local bee run commands
@@ -223,7 +223,7 @@ deploy-bee:
 
 run-bee:
 	@aws lambda invoke \
-		--function-name buzz-cpp-generic-playground-static-dev \
+		--function-name cloudfuse-lab-cpp-generic-playground-static-dev \
 		--log-type Tail \
 		--region ${REGION} \
 		--profile ${PROFILE} \
@@ -240,7 +240,7 @@ deploy-bench-query-bandwidth:
 	@# change the unused param "handler" to reset lambda state
 	number=1 ; while [[ $$number -le 1 ]] ; do \
 		aws lambda update-function-configuration \
-			--function-name buzz-cpp-generic-playground-static-dev \
+			--function-name cloudfuse-lab-cpp-generic-playground-static-dev \
 			--handler "N/A-$$number" \
 			--region ${REGION} \
 			--profile ${PROFILE}  > /dev/null 2>&1; \
@@ -256,7 +256,7 @@ deploy-bench-parquet-raw-reader:
 	@# change the unused param "handler" to reset lambda state
 	number=1 ; while [[ $$number -le 20 ]] ; do \
 		aws lambda update-function-configuration \
-			--function-name buzz-cpp-generic-playground-static-dev \
+			--function-name cloudfuse-lab-cpp-generic-playground-static-dev \
 			--handler "N/A-$$number" \
 			--region ${REGION} \
 			--profile ${PROFILE}  > /dev/null 2>&1; \
@@ -282,7 +282,7 @@ deploy-bench-parquet-raw-reader:
 run-hive:
 	@cd infra; terraform workspace select ${ENV}
 	aws ecs run-task \
-		--cluster buzz-cpp-cluster-${ENV} \
+		--cluster cloudfuse-lab-cpp-cluster-${ENV} \
 		--count 1 \
 		--region ${REGION} \
 		--profile ${PROFILE} \

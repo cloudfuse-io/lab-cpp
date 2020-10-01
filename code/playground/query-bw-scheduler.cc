@@ -12,7 +12,7 @@ static bool IS_LOCAL = false;  // util::getenv_bool("IS_LOCAL", false);
 static int NB_PARALLEL = util::getenv_int("NB_PARALLEL", 1);
 static int NB_INVOKE = util::getenv_int("NB_INVOKE", 1);
 static const char* BEE_FUNCTION_NAME =
-    util::getenv("BEE_FUNCTION_NAME", "buzz-cpp-generic-playground-static-dev");
+    util::getenv("BEE_FUNCTION_NAME", "cloudfuse-lab-cpp-generic-playground-static-dev");
 
 namespace {
 class ConnectRetryStrategy : public Aws::Client::RetryStrategy {

@@ -177,7 +177,7 @@ void Downloader::InitConnections(std::string bucket, int max_init_count) {
       // TODO how should we prefix to avoid slow down ?
       std::string randomized_key;
       randomized_key.push_back(util::random_alphanum());
-      randomized_key += "/buzzfakekey";
+      randomized_key += "/cloudfusefakekey";
       std::cout << "randomized_key:" << randomized_key << std::endl;
       req.SetKey(randomized_key);
       // we block before releasing the connection to allow up to

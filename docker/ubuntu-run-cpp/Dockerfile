@@ -23,6 +23,6 @@ RUN apt-get update -y -q \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-COPY buzz-${BUILD_FILE}-${BUILD_TYPE} /app
+COPY cloudfuse-lab-${BUILD_FILE}-${BUILD_TYPE} /app
 
 ENTRYPOINT ["/app"]

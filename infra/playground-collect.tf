@@ -6,7 +6,7 @@ module "mem-bandwidth-lambda" {
   source = "./lambda"
 
   function_base_name = "mem-bandwidth-static"
-  filename           = "${local.lambda_build_dir}/buzz-mem-bandwidth-static.zip"
+  filename           = "${local.lambda_build_dir}/cloudfuse-lab-mem-bandwidth-static.zip"
   handler            = "N/A"
   memory_size        = 2048
   timeout            = 10
@@ -22,7 +22,7 @@ module "query-bandwidth-lambda" {
   source = "./lambda"
 
   function_base_name = "query-bandwidth-static"
-  filename           = "${local.lambda_build_dir}/buzz-query-bandwidth-static.zip"
+  filename           = "${local.lambda_build_dir}/cloudfuse-lab-query-bandwidth-static.zip"
   handler            = "N/A"
   memory_size        = 2048
   timeout            = 10

@@ -144,11 +144,6 @@ run-local-parquet-raw-reader:
 	BUILD_FILE=parquet-raw-reader \
 	make run-bee-local
 
-run-local-parquet-bee:
-	COMPOSE_TYPE=minio \
-	BUILD_FILE=parquet-bee \
-	make run-bee-local
-
 run-local-mem-alloc-overprov:
 	COMPOSE_TYPE=standalone \
 	BUILD_FILE=mem-alloc-overprov \
@@ -222,7 +217,7 @@ deploy-bee:
 	cd infra; terraform apply \
 		-target=module.generic-playground-lambda \
 		-auto-approve \
-		--var profile=bbdev \
+		--var profile=${PROFILE} \
 		--var git_revision=${GIT_REVISION} \
 		--var generic_playground_file=${GEN_PLAY_FILE}
 
@@ -231,7 +226,7 @@ run-bee:
 		--function-name buzz-cpp-generic-playground-static-dev \
 		--log-type Tail \
 		--region ${REGION} \
-		--profile bbdev \
+		--profile ${PROFILE} \
 		--query 'LogResult' \
 		--output text \
 		/dev/null | base64 -d
@@ -248,7 +243,7 @@ deploy-bench-query-bandwidth:
 			--function-name buzz-cpp-generic-playground-static-dev \
 			--handler "N/A-$$number" \
 			--region ${REGION} \
-			--profile bbdev  > /dev/null 2>&1; \
+			--profile ${PROFILE}  > /dev/null 2>&1; \
 		make run-bee 2>&- | grep '^{.*query_bandwidth.*}$$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .run]|@csv'; \
 		make run-bee 2>&- | grep '^{.*query_bandwidth.*}$$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .run]|@csv'; \
 		make run-bee 2>&- | grep '^{.*query_bandwidth.*}$$' | jq -r '[.speed_MBpS, .MAX_PARALLEL, .run]|@csv'; \
@@ -264,7 +259,7 @@ deploy-bench-parquet-raw-reader:
 			--function-name buzz-cpp-generic-playground-static-dev \
 			--handler "N/A-$$number" \
 			--region ${REGION} \
-			--profile bbdev  > /dev/null 2>&1; \
+			--profile ${PROFILE}  > /dev/null 2>&1; \
 		make run-bee 2>&- | grep '^{.*phase_durations.*}$$' | jq -r '[.wait_foot, .wait_dl, .proc, .run]|@csv'; \
 		make run-bee 2>&- | grep '^{.*phase_durations.*}$$' | jq -r '[.wait_foot, .wait_dl, .proc, .run]|@csv'; \
 		((number = number + 1)) ; \
@@ -280,7 +275,7 @@ deploy-bench-parquet-raw-reader:
 # 	cd infra; terraform apply \
 # 		-target=module.query-bw-scheduler-fargate \
 # 		-auto-approve \
-# 		--var profile=bbdev \
+# 		--var profile=${PROFILE} \
 # 		--var git_revision=${GIT_REVISION} \
 # 		--var generic_playground_file=${GEN_PLAY_FILE}
 
@@ -290,7 +285,7 @@ run-hive:
 		--cluster buzz-cpp-cluster-${ENV} \
 		--count 1 \
 		--region ${REGION} \
-		--profile ${APPLY_PROFILE} \
+		--profile ${PROFILE} \
 		--task-definition ${BUILD_FILE}-static-${ENV} \
 		--query 'failures' \
 		--network-configuration "awsvpcConfiguration={\
@@ -300,7 +295,7 @@ run-hive:
 			}"
 
 run-query-bw-scheduler:
-	ENV=dev APPLY_PROFILE=bbdev BUILD_FILE=query-bw-scheduler make run-hive
+	ENV=dev BUILD_FILE=query-bw-scheduler make run-hive
 
 # deploy-run-hive: deploy-hive
 # 	sleep 2
@@ -308,22 +303,21 @@ run-query-bw-scheduler:
 
 ## deploy all commands
 
-init-dev:
-	cd infra; terraform workspace select dev
+init:
 	cd infra; terraform init
+
+destroy:
+	cd infra; terraform destroy --var generic_playground_file=${GEN_PLAY_FILE}
 
 force-deploy:
 	BUILD_FILE=query-bw-scheduler IMAGE_TAG="${GIT_REVISION}" make dockerify-hive
 	BUILD_FILE=query-bandwidth make package-bee
 	BUILD_FILE=mem-bandwidth make package-bee
 	BUILD_FILE=${GEN_PLAY_FILE} make package-bee
-	@echo "DEPLOYING ${GIT_REVISION} to ${ENV} ..."
-	@cd infra; terraform workspace select ${ENV}
+	@echo "DEPLOYING ${GIT_REVISION}..."
 	@cd infra; terraform apply \
-		--var profile=${APPLY_PROFILE} \
+		--var profile=${PROFILE} \
 		--var git_revision=${GIT_REVISION} \
 		--var generic_playground_file=${GEN_PLAY_FILE}
 	@echo "${GIT_REVISION} DEPLOYED !!!"
 
-force-deploy-dev:
-	ENV=dev APPLY_PROFILE=bbdev make force-deploy

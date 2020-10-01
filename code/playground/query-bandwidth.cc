@@ -14,6 +14,8 @@ static int MAX_PARALLEL = util::getenv_int("MAX_PARALLEL", 12);
 static int64_t CHUNK_SIZE = util::getenv_int("CHUNK_SIZE", 250000);
 static int MEMORY_SIZE = util::getenv_int("AWS_LAMBDA_FUNCTION_MEMORY_SIZE", 0);
 static bool IS_LOCAL = util::getenv_bool("IS_LOCAL", false);
+static const char* BUCKET_NAME = util::getenv("BUCKET_NAME", "defaultbucket");
+static const char* KEY_NAME = util::getenv("KEY_NAME", "default.parquet");
 
 static aws::lambda_runtime::invocation_response my_handler(
     const aws::lambda_runtime::invocation_request& req, const SdkOptions& options) {
@@ -23,7 +25,7 @@ static aws::lambda_runtime::invocation_response my_handler(
   Downloader downloader{synchronizer, MAX_PARALLEL, metrics_manager, options};
   // init connections
   auto nb_inits = MAX_PARALLEL;
-  downloader.InitConnections("bb-test-data-dev", nb_inits);
+  downloader.InitConnections(BUCKET_NAME, nb_inits);
   int inits_completed = 0;
   while (inits_completed < nb_inits) {
     // wait for all inits to be finised before moving to dl
@@ -35,9 +37,8 @@ static aws::lambda_runtime::invocation_response my_handler(
   // start download
   auto start_time = time::now();
   for (int i = 0; i < NB_CHUNCK; i++) {
-    downloader.ScheduleDownload({i * CHUNK_SIZE,
-                                 (i + 1) * CHUNK_SIZE - 1,
-                                 {"bb-test-data-dev", "bid-large.parquet"}});
+    downloader.ScheduleDownload(
+        {i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE - 1, {BUCKET_NAME, KEY_NAME}});
   }
   int downloaded_chuncks = 0;
   int downloaded_bytes = 0;

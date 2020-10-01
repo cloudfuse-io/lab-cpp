@@ -9,6 +9,8 @@ locals {
         NB_CONN_INIT : 1
         COLUMN_ID : 16
         AS_DICT : "true"
+        BUCKET_NAME : "defaultbucket"
+        KEY_NAME : "default.parquet"
       }
       additional_policies = [aws_iam_policy.s3-additional-policy.arn]
     }
@@ -18,6 +20,8 @@ locals {
         MAX_CONCURRENT_DL : 8
         NB_CONN_INIT : 1
         COLUMN_ID : 16
+        BUCKET_NAME : "defaultbucket"
+        KEY_NAME : "default.parquet"
       }
       additional_policies = [aws_iam_policy.s3-additional-policy.arn]
     }
@@ -27,6 +31,8 @@ locals {
         NB_CHUNCK : 12
         MAX_PARALLEL : 12
         CHUNK_SIZE : 250000
+        BUCKET_NAME : "defaultbucket"
+        KEY_NAME : "default.parquet"
       }
       additional_policies = [aws_iam_policy.s3-additional-policy.arn]
     }

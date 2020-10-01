@@ -42,6 +42,8 @@ static const int NB_CONN_INIT = util::getenv_int("NB_CONN_INIT", 1);
 static const int64_t COLUMN_ID = util::getenv_int("COLUMN_ID", 16);
 static const auto mem_pool = new CustomMemoryPool(arrow::default_memory_pool());
 static const bool IS_LOCAL = util::getenv_bool("IS_LOCAL", false);
+static const char* BUCKET_NAME = util::getenv("BUCKET_NAME", "defaultbucket");
+static const char* KEY_NAME = util::getenv("KEY_NAME", "default.parquet");
 
 // Read a column chunck
 int64_t read_column_chunck(std::shared_ptr<PartialFile> rg_file,
@@ -88,7 +90,7 @@ static aws::lambda_runtime::invocation_response my_handler(
   auto downloader = std::make_shared<Downloader>(synchronizer, MAX_CONCURRENT_DL,
                                                  metrics_manager, options);
 
-  S3Path file_path{"bb-test-data-dev", "bid-large.parquet"};
+  S3Path file_path{BUCKET_NAME, KEY_NAME};
 
   auto file_metadata =
       GetMetadata(downloader, synchronizer, mem_pool, file_path, NB_CONN_INIT);

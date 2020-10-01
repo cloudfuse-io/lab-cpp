@@ -1,9 +1,5 @@
 terraform {
-  backend "s3" {
-    bucket = "bloomblob-terraform-backend"
-    key    = "arrow-cpp"
-    region = "eu-west-1"
-  }
+  backend "s3" {}
   required_version = ">=0.12"
 }
 

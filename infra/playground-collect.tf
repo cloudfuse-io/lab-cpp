@@ -30,9 +30,11 @@ module "query-bandwidth-lambda" {
 
   additional_policies = [aws_iam_policy.s3-additional-policy.arn]
   environment = {
-    NB_CHUNCK = 12
+    NB_CHUNCK    = 12
     MAX_PARALLEL = 12
-    CHUNK_SIZE  = 250000
+    CHUNK_SIZE   = 250000
+    BUCKET_NAME  = "defaultbucket"
+    KEY_NAME     = "default.parquet"
   }
 }
 

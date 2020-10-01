@@ -33,7 +33,6 @@ add_subdirectory(arrow/cpp)
 set(CMAKE_BUILD_TYPE "${BUILD_TYPE_SAVED}")
 add_subdirectory(util)
 add_subdirectory(aws)
-add_subdirectory(bee)
 
 # we build exec files 1 by 1, acording to the BUZZ_BUILD_FILE var
 set(HIVE_FILES flight-server query-bw-scheduler)
@@ -59,7 +58,7 @@ elseif(BUZZ_BUILD_FILE)
   list(APPEND BUZZ_ALL ${BUZZ_TARGET})
 
   target_link_libraries(${BUZZ_TARGET}
-    PRIVATE AWS::aws-lambda-runtime buzz-aws buzz-util buzz-bee
+    PRIVATE AWS::aws-lambda-runtime buzz-aws buzz-util
   )
   target_link_arrow(${BUZZ_TARGET})
 else()
